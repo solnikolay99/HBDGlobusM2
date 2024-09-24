@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image
 
 
-def save(folder_path, output_path):
+def save(folder_path: str, output_path: str):
     output_path = output_path + '.mp4'
     files = sorted([f for f in os.listdir(folder_path) if f.endswith(('.png', '.jpg', '.jpeg'))])
     images = []
@@ -38,20 +38,21 @@ def save(folder_path, output_path):
     print(f'Анимация сохранена как {output_path}')
 
 
-folder_path, output_path = '001', '001_1-1-5-without'
-save(folder_path, output_path)
-folder_path, output_path = '002', '001_3-1-5-without'
-save(folder_path, output_path)
-folder_path, output_path = '003', '001_3-0.5-5-without'
-save(folder_path, output_path)
-folder_path, output_path = '004', '001_3-0.5-10-without'
-save(folder_path, output_path)
+if __name__ == '__main__':
+    folder_path, output_path = '001', '001_1-1-5-without'
+    save(folder_path, output_path)
+    folder_path, output_path = '002', '001_3-1-5-without'
+    save(folder_path, output_path)
+    folder_path, output_path = '003', '001_3-0.5-5-without'
+    save(folder_path, output_path)
+    folder_path, output_path = '004', '001_3-0.5-10-without'
+    save(folder_path, output_path)
 
-folder_path, output_path = '005', '001_1-1-5-with'
-save(folder_path, output_path)
-folder_path, output_path = '006', '001_3-1-5-with'
-save(folder_path, output_path)
-folder_path, output_path = '007', '001_3-0.5-5-with'
-save(folder_path, output_path)
-folder_path, output_path = '008', '001_3-0.5-10-with'
-save(folder_path, output_path)
+    folder_path, output_path = '005', '001_1-1-5-with'
+    save(folder_path, output_path)
+    folder_path, output_path = '006', '001_3-1-5-with'
+    save(folder_path, output_path)
+    folder_path, output_path = '007', '001_3-0.5-5-with'
+    save(folder_path, output_path)
+    folder_path, output_path = '008', '001_3-0.5-10-with'
+    save(folder_path, output_path)

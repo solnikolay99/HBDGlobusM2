@@ -42,5 +42,6 @@ def save(folder, name):
     np.save(name + '.npy', grd)
 
 
-save('/008', 'data/008')
-# save('/now', 'data/now')
+if __name__ == '__main__':
+    save('/008', 'data/008')
+    # save('/now', 'data/now')

@@ -2,11 +2,7 @@
 # @author: L. I. Nurtdinova
 # ******************************************************************************
 
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 # from scipy.ndimage import gaussian_filter
-import copy
 # from scipy.ndimage import gaussian_filter
 import copy
 
@@ -67,25 +63,26 @@ window_size = 25
 # characteristics(slice, lab)
 
 
-name = '008'
-lab = '2D'
-slice = load(name + '.npy', lab, 480, sigma)[:, 480]
-kernel = np.ones(window_size) / window_size
-slice = np.convolve(slice, kernel, mode='valid')
-plt.plot(slice, label=lab, color='orange')
-plt.legend()
-
-# data.to_excel('Results.xlsx')
-# Output in the required axes
-
-if 0:
-    numx = 6
-    x_ticks = [f'{val:.0f}' if val.is_integer() else f'{val:.1f}'.rstrip('0').rstrip('.') for val in
-               np.linspace(0, y * 0.25, num=numx)]
-    plt.xticks(np.linspace(0, y, num=numx), x_ticks)
-    plt.xlabel('y, мм')
-    plt.ylabel('Плотность')
-    plt.grid(color='black', linestyle='-', linewidth=0.2)
+if __name__ == '__main__':
+    name = '008'
+    lab = '2D'
+    slice = load(name + '.npy', lab, 480, sigma)[:, 480]
+    kernel = np.ones(window_size) / window_size
+    slice = np.convolve(slice, kernel, mode='valid')
+    plt.plot(slice, label=lab, color='orange')
     plt.legend()
 
-plt.show()
+    # data.to_excel('Results.xlsx')
+    # Output in the required axes
+
+    if True:
+        numx = 6
+        x_ticks = [f'{val:.0f}' if val.is_integer() else f'{val:.1f}'.rstrip('0').rstrip('.') for val in
+                   np.linspace(0, y * 0.25, num=numx)]
+        plt.xticks(np.linspace(0, y, num=numx), x_ticks)
+        plt.xlabel('y, мм')
+        plt.ylabel('Плотность')
+        plt.grid(color='black', linestyle='-', linewidth=0.2)
+        plt.legend()
+
+    plt.show()
