@@ -21,17 +21,17 @@ if __name__ == '__main__':
     pattern = 'mask*'
     matching_file = sorted(glob.glob(directory_path + '/' + pattern))
     mask = np.load(matching_file[0])
-    coorx = np.load(name_reader(directory_path, 'coorx*')[0])
-    coory = np.load(name_reader(directory_path, 'coory*')[0])
-    ln = coorx.shape[0]
+    coord_x = np.load(name_reader(directory_path, 'coord_x*')[0])
+    coord_y = np.load(name_reader(directory_path, 'coord_y*')[0])
+    ln = coord_x.shape[0]
     x, y = mask.shape[:2]
     m = 1
 
     plt.figure(figsize=(5, 5))
     for i in range(2, ln, 10):
         print(i)
-        plt.plot(m * coorx[i, :], m * coory[i, :], linewidth=0.5)
-        # plt.scatter(m*coorx[i, :], m*coory[i, :], s=0.9)
+        plt.plot(m * coord_x[i, :], m * coord_y[i, :], linewidth=0.5)
+        # plt.scatter(m*coord_x[i, :], m*coord_y[i, :], s=0.9)
     plt.imshow(mask)
     plt.grid(color='black', linestyle='-', linewidth=0.2)
 

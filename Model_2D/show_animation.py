@@ -5,6 +5,7 @@
 import datetime
 import glob
 import os
+import shutil
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,7 +21,7 @@ def name_reader(dir_path, pattern):
 
 def update(frame):
     ax.clear()
-    ax.scatter(m * coorx[:, frame], m * coory[:, frame], marker='.', s=0.5, color='#ff531f')
+    ax.scatter(m * coord_x[:, frame], m * coord_y[:, frame], marker='.', s=0.5, color='#ff531f')
     plt.title(str(0.25 * frame) + ' мкс')
     x, y = int(round(mask.shape[1], -3)), int(round(mask.shape[1], -3))
     numx, numy = 6, 11
@@ -38,31 +39,35 @@ def update(frame):
     ax.imshow(mask)
     current_datetime = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     if saving:
-        plt.savefig(str(directory_path) + '/prof' + str(current_datetime) + '.png', dpi=600, bbox_inches='tight')
+        plt.savefig(str(directory_path) + '/profs/prof' + str(current_datetime) + '.png', dpi=600, bbox_inches='tight')
         print(f'{frame} frame was saved')
 
 
 if __name__ == '__main__':
     # Считывание массивов из файлов и их конкатенация
-    directory_path = os.getcwd() + '/data'
+    directory_path = os.getcwd() + '/data/'
+    out_directory = os.getcwd() + '/data/profs/'
+    shutil.rmtree(out_directory, ignore_errors=True)
+    os.makedirs(out_directory, exist_ok=True)
     # directory_path = os.getcwd() + '/008'
     mask = np.load(sorted(glob.glob(directory_path + '/' + 'mask*'))[0])
-    coorx = np.load(name_reader(directory_path, 'coorx*')[0])
-    coory = np.load(name_reader(directory_path, 'coory*')[0])
+    coord_x = np.load(name_reader(directory_path, 'coord_x*')[0])
+    coord_y = np.load(name_reader(directory_path, 'coord_y*')[0])
     r = 1
-    coorx, coory = coorx[::r, :], coory[::r, :]
+    coord_x, coord_y = coord_x[::r, :], coord_y[::r, :]
     fig, ax = plt.subplots(figsize=(10, 6))
     m = 1
 
     saving = 1
 
-    ani = FuncAnimation(fig, update, frames=range(0, 1500, 5), interval=1)
+    ani = FuncAnimation(fig, update, frames=range(0, len(coord_x), 5), interval=1)
     if saving:
-        ani.save('animation.mp4', writer='ffmpeg')
+        #ani.save('animation.mp4', writer='ffmpeg')
+        ani.save(directory_path + 'animation.gif')
     else:
         plt.show()
 
-    if True:
+    if not saving:
         x = int(round(mask.shape[1], -3))
         y = int(round(mask.shape[0], -3))
         numx = 11
@@ -79,3 +84,4 @@ if __name__ == '__main__':
         plt.xlim(0, mask.shape[1])
         plt.ylim(0, mask.shape[0])
         plt.grid(color='black', linestyle='-', linewidth=0.2)
+        plt.show()
