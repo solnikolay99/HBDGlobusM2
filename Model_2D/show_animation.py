@@ -60,7 +60,7 @@ if __name__ == '__main__':
 
     saving = 1
 
-    ani = FuncAnimation(fig, update, frames=range(0, len(coord_x), 5), interval=1)
+    ani = FuncAnimation(fig, update, frames=range(0, len(coord_x[0]), 5), interval=1)
     if saving:
         #ani.save('animation.mp4', writer='ffmpeg')
         ani.save(directory_path + 'animation.gif')

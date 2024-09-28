@@ -4,10 +4,12 @@
 
 import datetime
 import os
+import time
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+
 from config import *
 
 
@@ -74,19 +76,19 @@ def mesh(shape_y: int, shape_x: int, height: float, m: int) -> np.array:
     shape_y *= m
     height *= m
     mask = 35 * np.ones((shape_y, shape_x))
-    '''
+
     aperture_width = 40 * m
     aperture_l2 = int(shape_y // 2 - 8 * height)
     x = 160 * m
-    mask[:aperture_l2, x:x + aperture_width] = calc_wall(aperture_width, aperture_l2)
-    mask[shape_y - aperture_l2:, x:x + aperture_width] = np.flipud(calc_wall(aperture_width, aperture_l2)) + 2
+    mask[:aperture_l2, x:x + aperture_width] = wall_mask(aperture_width, aperture_l2)
+    mask[shape_y - aperture_l2:, x:x + aperture_width] = np.flipud(wall_mask(aperture_width, aperture_l2)) + 2
 
     aperture_width = 40 * m
     aperture_l2 = int(shape_y // 2 - 8 * height)
     x = 360 * m
-    mask[:aperture_l2, x:x + aperture_width] = calc_wall(aperture_width, aperture_l2)
-    mask[shape_y - aperture_l2:, x:x + aperture_width] = np.flipud(calc_wall(aperture_width, aperture_l2)) + 2
-    '''
+    mask[:aperture_l2, x:x + aperture_width] = wall_mask(aperture_width, aperture_l2)
+    mask[shape_y - aperture_l2:, x:x + aperture_width] = np.flipud(wall_mask(aperture_width, aperture_l2)) + 2
+
     aperture_width = 20 * m
     aperture_l2 = int(shape_y // 2 - 4 * height)
     x = 560 * m
@@ -102,6 +104,19 @@ def read_mask() -> np.array:
     return pl + cv2.imread('data/output_image.png')[:, :, 2]
 
 
+timers = {}
+
+
+def start_timer(timer_name: str):
+    timers[timer_name] = time.time()
+    pass
+
+
+def release_timer(timer_name: str):
+    print(f"Execution time for '{timer_name}' is {time.time() - timers[timer_name]:.4f}")
+    pass
+
+
 # Считывание маски диафрагмы
 # aperture_mask = read_mask()
 aperture_mask = mesh(shape_y, shape_x, height, m)  # маска диафрагмы
@@ -115,7 +130,7 @@ if __name__ == '__main__':
     # Задание массивов координат и скоростей
     coord_y = np.ones((full_size, time_steps))
     coord_x = np.ones((full_size, time_steps))
-    coord_x[:, 0] = np.random.uniform(5, thresh, full_size)
+    coord_x[:, 0] = np.random.uniform(5, capillary_length, full_size)
     coord_y[:, 0] = np.random.uniform(shape_y // 2 - height, shape_y // 2 + height, full_size)
     vy = np.zeros(full_size)
     vx = np.zeros(full_size)
@@ -127,17 +142,21 @@ if __name__ == '__main__':
     # Проход по временному циклу
     for i in range(1, time_steps):
 
-        print(size, ' - len,', i, ' - time')
-        grd = np.zeros((shape_y, shape_x, N, 3))
+        print(size, ' - len,', i, ' - time step')
+
+        start_timer('Main cycle')
+
+        grd = np.zeros((shape_y, shape_x, max_points_per_cell, 3))
         grd_ch = np.zeros((shape_y, shape_x))
 
         # Проход по частицам
+        start_timer('First iteration over points')
         for j in range(1, size):
             if is_in[j]:
                 vel = np.sqrt(vx[j] ** 2 + vy[j] ** 2) * 1e-8
                 if vel != 0 and vx_f[j] == 1:
                     velocities.append(vel)
-                if coord_x[j, i - 1] > thresh and vx_f[j] == 0:
+                if coord_x[j, i - 1] > capillary_length and vx_f[j] == 0:
                     vx_f[j] = 1
                     v = inverse_maxwell_distribution(np.random.rand(1))
                     ang = 2 * np.pi * np.random.uniform(0, 1)
@@ -176,9 +195,9 @@ if __name__ == '__main__':
                         cond3 = coord_x[j, i - 1] > coord_y[j, i - 1] + 20 + 400
                         c_cond3 = cond1 and cond2 and cond3
 
-                        di1_cond = di1 < (full_size - ln) * 0.2
-                        di2_cond = di2 < (full_size - ln) * 0.3
-                        di3_cond = di3 < (full_size - ln) * 0.5
+                        di1_cond = di[0] < (full_size - ln) * 0.2
+                        di2_cond = di[1] < (full_size - ln) * 0.3
+                        di3_cond = di[2] < (full_size - ln) * 0.5
 
                         if (c_cond1 and di1_cond) or (c_cond2 and di2_cond) or (c_cond3 and di3_cond):
                             if np.random.uniform(0, 1) < prob:
@@ -193,25 +212,27 @@ if __name__ == '__main__':
                                 vx_f[size] = vx_f[j]
                                 size += 1
                                 if c_cond1 and di1_cond:
-                                    di1 += 1
+                                    di[0] += 1
                                 if c_cond2 and di2_cond:
-                                    di2 += 1
+                                    di[1] += 1
                                 if c_cond3 and di3_cond:
-                                    di3 += 1
+                                    di[2] += 1
 
                 calcDouble = vx[j] > 0 or j < ln
                 # Добавление частиц в расчетную сетку для метода Монте-Карло
                 if calcDouble:
                     a = grd[round(coord_y[j, i - 1]), round(coord_x[j, i - 1])]
                     index = int(grd_ch[round(coord_y[j, i - 1]), round(coord_x[j, i - 1])])
-                    if index < N:
+                    if index < max_points_per_cell:
                         a[index][0] = j
                         a[index][1] = vx[j]
                         a[index][2] = vy[j]
                         grd_ch[round(coord_y[j, i - 1]), round(coord_x[j, i - 1])] += 1
+        release_timer('First iteration over points')
 
         # Проход по сетке для расчета скоростей частиц по методу Монте-Карло
-        for cell_i in range(thresh, shape_x):
+        start_timer('Iteration over cells')
+        for cell_i in range(capillary_length, shape_x):
             for cell_j in range(bias, shape_y - bias):
                 num_part = int(grd_ch[cell_j, cell_i])
                 if num_part > 0:
@@ -235,8 +256,10 @@ if __name__ == '__main__':
                                 vy[q] = (k[7] + k[8]) / 2 + zn2 * k[2] / 2 * np.sin(ang1)
                                 vx[w] = (k[5] + k[6]) / 2 - zn * k[2] / 2 * np.cos(ang1)
                                 vy[w] = (k[7] + k[8]) / 2 - zn2 * k[2] / 2 * np.sin(ang1)
+        release_timer('Iteration over cells')
 
         # Второй проход по частицам
+        start_timer('Second iteration over points')
         for j in range(1, size):
             if is_in[j]:
                 a = aperture_mask[round(m * coord_y[j, i - 1]), round(m * coord_x[j, i - 1])]
@@ -342,6 +365,9 @@ if __name__ == '__main__':
                         coord_x[j, i] = shape_x - bias
                     if cond4:
                         coord_x[j, i] = x_min_lim
+        release_timer('Second iteration over points')
+
+        release_timer('Main cycle')
 
     coord_x = coord_x[:size, :]
     coord_y = coord_y[:size, :]
@@ -356,7 +382,7 @@ if __name__ == '__main__':
         'time': time_steps,
         'height': height,
         'bias': bias,
-        'thresh': thresh,
+        'thresh': capillary_length,
         'current_datetime': current_datetime
     }
 

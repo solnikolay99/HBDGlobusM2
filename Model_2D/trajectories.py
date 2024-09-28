@@ -28,7 +28,8 @@ if __name__ == '__main__':
     m = 1
 
     plt.figure(figsize=(5, 5))
-    for i in range(2, ln, 10):
+    #for i in range(2, ln, 10):
+    for i in range(0, ln):
         print(i)
         plt.plot(m * coord_x[i, :], m * coord_y[i, :], linewidth=0.5)
         # plt.scatter(m*coord_x[i, :], m*coord_y[i, :], s=0.9)
