@@ -29,6 +29,13 @@ class Point:
     def __deepcopy__(self, memodict={}):
         return Point(self.x, self.y)
 
+    def __getstate__(self) -> dict:
+        return {"x": self.x, "y": self.y}
+
+    def __setstate__(self, state: dict):
+        self.x = state["x"]
+        self.y = state["y"]
+
 
 class AdditParams:
     def __init__(self,

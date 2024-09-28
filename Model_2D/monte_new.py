@@ -6,6 +6,8 @@ import copy
 import datetime
 import os
 import time
+import pickle
+import shutil
 
 import cv2
 import matplotlib.pyplot as plt
@@ -326,6 +328,49 @@ def checking_boundaries(points: list[Point]):
     pass
 
 
+def dump_to_file(timestamp: datetime, frames: list[list[Point]]):
+    cur_date_str = timestamp.strftime('%Y-%m-%d_%H-%M-%S')
+
+    os.makedirs(out_folder, exist_ok=True)
+
+    filename_mask1 = 'data/mask.npy'
+    filename_coord_x1 = 'data/coord_x.npy'
+    filename_coord_y1 = 'data/coord_y.npy'
+    filename_time_frames1 = 'data/timeframes.pkl'
+    params_tmpl = f"{shape_x}_time={time_steps}_len={size}_height={height}_bias={bias}_thresh={capillary_length}_{cur_date_str}"
+    filename_mask2 = f"{out_folder}/mask_sh={params_tmpl}.npy"
+    filename_coord_x2 = f"{out_folder}/coord_x_sh={params_tmpl}.npy"
+    filename_coord_y2 = f"{out_folder}/coord_y_sh={params_tmpl}.npy"
+    filename_time_frames2 = f"{out_folder}/timeframes={params_tmpl}.pkl"
+
+    start_timer('Convert to old arrays')
+    coord_x = np.zeros((full_size, time_steps))
+    coord_y = np.zeros((full_size, time_steps))
+    for i in range(len(frames)):
+        for j in range(len(frames[i])):
+            coord_x[j][i] = frames[i][j].x
+            coord_y[j][i] = frames[i][j].y
+    release_timer('Convert to old arrays')
+
+    start_timer('Dump old arrays')
+    np.save(filename_coord_x1, coord_x)
+    np.save(filename_coord_y1, coord_y)
+    shutil.copyfile(filename_coord_x1, filename_coord_x2)
+    shutil.copyfile(filename_coord_y1, filename_coord_y2)
+    release_timer('Dump old arrays')
+
+    np.save(filename_mask1, aperture_mask)
+    shutil.copyfile(filename_mask1, filename_mask2)
+
+    start_timer('Dump new array')
+    with open(filename_time_frames1, 'wb') as out_file:
+        pickle.dump(frames, out_file)
+    shutil.copyfile(filename_time_frames1, filename_time_frames2)
+    release_timer('Dump new array')
+
+    pass
+
+
 def plot_trajectories():
     plt.grid(which='both', color='black', linestyle='-', linewidth=0.5)
     for n in range(size):
@@ -392,52 +437,9 @@ if __name__ == '__main__':
 
         release_timer('Main cycle')
 
-    list_points = list_points[:size]
-    # Вывод траекторий, если требуется
-
     # Сохранение координат частиц в файл
-    current_datetime = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    dump_to_file(datetime.datetime.now(), time_frames)
 
-    params = {
-        'sh': shape_x,
-        'len': size,
-        'time': time_steps,
-        'height': height,
-        'bias': bias,
-        'thresh': capillary_length,
-        'current_datetime': current_datetime
-    }
-
-    os.makedirs(out_folder, exist_ok=True)
-
-    filename_mask = 'data/mask.npy'
-    filename_coord_x = 'data/coord_x.npy'
-    filename_coord_y = 'data/coord_y.npy'
-    filename_mask2 = out_folder + '/mask_sh={sh}_time={time}_len={len}_height={height}_bias={bias}_thresh={thresh}_{current_datetime}.npy'.format(
-        **params)
-    filename_coord_x2 = out_folder + '/coord_x_sh={sh}_time={time}_len={len}_height={height}_bias={bias}_thresh={thresh}_{current_datetime}.npy'.format(
-        **params)
-    filename_coord_y2 = out_folder + '/coord_y_sh={sh}_time={time}_len={len}_height={height}_bias={bias}_thresh={thresh}_{current_datetime}.npy'.format(
-        **params)
-
-    #coord_x = [[point.x for point in points] for points in time_frames]
-    #coord_y = [[point.y for point in points] for points in time_frames]
-
-    coord_x = np.zeros((full_size, time_steps))
-    coord_y = np.zeros((full_size, time_steps))
-    for i in range(len(time_frames)):
-        for j in range(len(time_frames[i])):
-            coord_x[j][i] = time_frames[i][j].x
-            coord_y[j][i] = time_frames[i][j].y
-
-    np.save(filename_coord_x, coord_x)
-    np.save(filename_coord_y, coord_y)
-    np.save(filename_mask, aperture_mask)
-    np.save(filename_coord_x2, coord_x)
-    np.save(filename_coord_y2, coord_y)
-    np.save(filename_mask2, aperture_mask)
-
+    # Вывод траекторий, если требуется
     if True:
         plot_trajectories()
-
-    # os.system('afplay/System/Library/Sounds/Glass.aiff')
