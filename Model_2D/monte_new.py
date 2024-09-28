@@ -123,7 +123,13 @@ def read_mask() -> np.array:
 def initiate_points(count_points: int, max_length: int, y_size: int, half_height: float) -> list[Point]:
     coords_x = np.random.uniform(5, max_length, count_points)
     coords_y = np.random.uniform(y_size // 2 - half_height, y_size // 2 + half_height, count_points)
-    return [Point(coords_x[i], coords_y[i], 0) for i in range(count_points)]
+    return [Point(x=coords_x[i],
+                  y=coords_y[i],
+                  # z=0,
+                  v_x=0,
+                  v_y=0,
+                  v_z=0,
+                  is_in=True) for i in range(count_points)]
 
 
 def check_capillary(point: Point) -> Point:

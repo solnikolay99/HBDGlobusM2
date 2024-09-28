@@ -3,24 +3,44 @@ import numpy as np
 
 class Point:
     def __init__(self,
-                 x: float = 0.0,
-                 y: float = 0.0,
-                 z: float = 0.0,
+                 x: float = None,
+                 y: float = None,
+                 z: float = None,
+                 v_x: float = None,
+                 v_y: float = None,
+                 v_z: float = None,
+                 is_in: bool = None):
+        if x is not None:
+            self.x: float = x  # x coordinate
+        if y is not None:
+            self.y: float = y  # y coordinate
+        if z is not None:
+            self.z: float = z  # z coordinate
+        if v_x is not None:
+            self.v_x: float = v_x  # x velocity
+        if v_y is not None:
+            self.v_y: float = v_y  # y velocity
+        if v_z is not None:
+            self.v_z: float = v_z  # z velocity
+        if is_in is not None:
+            self.is_in: bool = is_in
+        pass
+
+    def __deepcopy__(self, memodict={}):
+        return Point(self.x, self.y)
+
+
+class AdditParams:
+    def __init__(self,
                  v_x: float = 0.0,
                  v_y: float = 0.0,
                  v_z: float = 0.0,
                  is_in: bool = True):
-        self.x: float = x  # x coordinate
-        self.y: float = y  # y coordinate
-        self.z: float = z  # z coordinate
         self.v_x: float = v_x  # x velocity
         self.v_y: float = v_y  # y velocity
         self.v_z: float = v_z  # z velocity
         self.is_in: bool = is_in
         pass
-
-    def __deepcopy__(self, memodict={}):
-        return Point(self.x, self.y, self.z, self.v_x, self.v_y, self.v_z, self.is_in)
 
 
 class Randoms:
