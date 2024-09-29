@@ -86,32 +86,32 @@ def wall_mask(aperture_width: float, aperture_l2: float) -> np.array:
     return wall
 
 
-def mesh(max_y: int, max_x: int, height: float, m: int) -> np.array:
+def mesh(max_y: int, max_x: int, height: float, multiply: int) -> np.array:
     """
     aperture_width - ширина диафрагмы
     aperture_l2 - расстояние между осью и нижней точкой диафрагмы
     x - координата по x левого края диафрагмы
     """
-    max_x *= m
-    max_y *= m
-    height *= m
+    max_x *= multiply
+    max_y *= multiply
+    height *= multiply
     mask = 35 * np.ones((max_y, max_x))
 
-    aperture_width = 20 * m
+    aperture_width = 20 * multiply
     aperture_l2 = int(max_y // 2 - 8 * height)
-    x = 160 * m
+    x = 160 * multiply
     mask[:aperture_l2, x:x + aperture_width] = wall_mask(aperture_width, aperture_l2)
     mask[max_y - aperture_l2:, x:x + aperture_width] = np.flipud(wall_mask(aperture_width, aperture_l2)) + 2
 
-    aperture_width = 20 * m
+    aperture_width = 20 * multiply
     aperture_l2 = int(max_y // 2 - 8 * height)
-    x = 360 * m
+    x = 360 * multiply
     mask[:aperture_l2, x:x + aperture_width] = wall_mask(aperture_width, aperture_l2)
     mask[max_y - aperture_l2:, x:x + aperture_width] = np.flipud(wall_mask(aperture_width, aperture_l2)) + 2
 
-    aperture_width = 20 * m
+    aperture_width = 20 * multiply
     aperture_l2 = int(max_y // 2 - 4 * height)
-    x = 560 * m
+    x = 560 * multiply
     mask[:aperture_l2, x:x + aperture_width] = wall_mask(aperture_width, aperture_l2)
     mask[max_y - aperture_l2:, x:x + aperture_width] = np.flipud(wall_mask(aperture_width, aperture_l2)) + 2
 
@@ -133,7 +133,8 @@ def initiate_points(count_points: int, max_length: int, y_size: int, half_height
                   v_x=0,
                   v_y=0,
                   v_z=0,
-                  is_in=True) for i in range(count_points)]
+                  is_in=True,
+                  in_capillary=True) for i in range(count_points)]
 
 
 def check_capillary(point: Point) -> Point:
@@ -148,22 +149,21 @@ def split_to_cells(points: list[Point]) -> dict[str, list[Point]]:
     grid_dict = {}
     for j in range(len(points)):
         if points[j].is_in:
-            if points[j].x > capillary_length and vx_f[j] == 0:
-                vx_f[j] = 1
-                v = inverse_maxwell_distribution(randoms_1.get_next())
-                angel = randoms_2pi.get_next()
-                points[j].v_x = Vx + v * np.cos(angel)
-                points[j].v_y = v * np.sin(angel)
-                points[j] = check_capillary(points[j])
-            elif vx_f[j] == 0:
-                points[j].v_x = V_pot
-                points[j].v_y = 1
+            if points[j].in_capillary:
+                if points[j].x > capillary_length:
+                    points[j].in_capillary = False
+                    v = inverse_maxwell_distribution(randoms_1.get_next())
+                    angel = randoms_2pi.get_next()
+                    points[j].v_x = Vx + v * np.cos(angel)
+                    points[j].v_y = v * np.sin(angel)
+                else:
+                    points[j].v_x = V_pot
+                    points[j].v_y = 1
                 points[j] = check_capillary(points[j])
 
             # Размножение частиц
-            '''
             if len(points) < full_size:
-                if points[j].x > 0 and vx_f[j] == 1:
+                if points[j].x > 0 and not points[j].in_capillary:
                     cond1 = points[j].x < 159
                     cond2 = points[j].x > shape_y - points[j].y + 20
                     cond3 = points[j].x > points[j].y + 20
@@ -177,32 +177,29 @@ def split_to_cells(points: list[Point]) -> dict[str, list[Point]]:
                     cond3 = points[j].x > points[j].y + 20 + 400
                     c_cond3 = cond1 and cond2 and cond3
 
-                    di1_cond = di[0] < (full_size - ln) * 0.2
-                    di2_cond = di[1] < (full_size - ln) * 0.3
-                    di3_cond = di[2] < (full_size - ln) * 0.5
+                    di1_cond = di[0] < (full_size - size) * 0.2
+                    di2_cond = di[1] < (full_size - size) * 0.3
+                    di3_cond = di[2] < (full_size - size) * 0.5
 
                     if (c_cond1 and di1_cond) or (c_cond2 and di2_cond) or (c_cond3 and di3_cond):
                         if randoms_1.get_next() < prob:
-                            coord_x[size, :i - 2] = points[j].x
-                            coord_x[size, i - 2:] = points[j].x + 0.5 * np.sign(
-                                randoms_mp1.get_next()) * randoms_1.get_next()
-                            coord_y[size, :i - 2] = points[j].y
-                            coord_y[size, i - 2:] = points[j].y + 0.5 * np.sign(
-                                randoms_mp1.get_next()) * randoms_1.get_next()
-                            vx[size] = vx[j]
-                            vy[size] = vy[j]
-                            vx_f[size] = vx_f[j]
-                            size += 1
+                            new_point = Point(
+                                x=points[j].x + 0.5 * np.sign(randoms_mp1.get_next()) * randoms_1.get_next(),
+                                y=points[j].y + 0.5 * np.sign(randoms_mp1.get_next()) * randoms_1.get_next(),
+                                v_x=points[j].v_x,
+                                v_y=points[j].v_y,
+                                is_in=points[j].is_in,
+                                in_capillary=points[j].in_capillary)
+                            points.append(new_point)
                             if c_cond1 and di1_cond:
                                 di[0] += 1
                             if c_cond2 and di2_cond:
                                 di[1] += 1
                             if c_cond3 and di3_cond:
                                 di[2] += 1
-            '''
 
             # Добавление частиц в расчетную сетку для метода Монте-Карло
-            if points[j].v_x > 0 or j < ln:
+            if points[j].v_x > 0 or j < full_size:
                 key = f"{round(points[j].y)}_{round(points[j].x)}"
                 if key not in grid_dict:
                     grid_dict[key] = [points[j]]
@@ -290,7 +287,7 @@ def checking_boundaries(points: list[Point]):
         points[j].x += points[j].v_x * t_step
         points[j].y += points[j].v_y * t_step
 
-        if vx_f[j] == 1:
+        if not points[j].in_capillary:
 
             cond1 = points[j].y > shape_y - bias
             cond2 = points[j].y < bias
@@ -343,10 +340,15 @@ def dump_to_file(timestamp: datetime, frames: list[list[Point]]):
     start_timer('Convert to old arrays')
     coord_x = np.zeros((full_size, time_steps))
     coord_y = np.zeros((full_size, time_steps))
+    max_size = 0
     for i in range(len(frames)):
+        if max_size < len(frames[i]):
+            max_size = len(frames[i])
         for j in range(len(frames[i])):
             coord_x[j][i] = frames[i][j].x
             coord_y[j][i] = frames[i][j].y
+    coord_x = coord_x[:max_size, :]
+    coord_y = coord_y[:max_size, :]
     release_timer('Convert to old arrays')
 
     start_timer('Dump old arrays')
@@ -397,7 +399,7 @@ aperture_mask = mesh(shape_y, shape_x, height, m)  # маска диафрагм
 if __name__ == '__main__':
     # Задание массивов координат и скоростей
     start_timer('Initiate points')
-    list_points = initiate_points(full_size, capillary_length, shape_y, height)
+    list_points = initiate_points(size, capillary_length, shape_y, height)
     release_timer('Initiate points')
 
     start_timer('First deep copy')
@@ -407,9 +409,6 @@ if __name__ == '__main__':
     start_timer('Initiate randoms')
     initiate_randoms()
     release_timer('Initiate randoms')
-
-    vx_f = np.zeros(full_size)
-    # is_in = np.ones(full_size)
 
     # Проход по временному циклу
     for t in range(1, time_steps):
@@ -423,7 +422,6 @@ if __name__ == '__main__':
         release_timer('Split to cells')
 
         # Проход по сетке для расчета скоростей частиц по методу Монте-Карло
-        # print(f"Count cells for recalculation is {len(grid_map.keys())}")
         start_timer('Iteration over cells')
         iterate_over_grid(grid_map)
         release_timer('Iteration over cells')

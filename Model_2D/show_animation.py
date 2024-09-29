@@ -48,8 +48,10 @@ if __name__ == '__main__':
     # Считывание массивов из файлов и их конкатенация
     directory_path = os.getcwd() + '/data/'
     out_directory = os.getcwd() + '/data/profs/'
+
     shutil.rmtree(out_directory, ignore_errors=True)
     os.makedirs(out_directory, exist_ok=True)
+
     # directory_path = os.getcwd() + '/008'
     mask = np.load(sorted(glob.glob(directory_path + '/' + 'mask*'))[0])
     coord_x = np.load(name_reader(directory_path, 'coord_x*')[0])
@@ -67,6 +69,8 @@ if __name__ == '__main__':
         ani.save(directory_path + 'animation.gif')
     else:
         plt.show()
+
+    shutil.rmtree(out_directory, ignore_errors=True)
 
     if not saving:
         x = int(round(mask.shape[1], -3))

@@ -9,7 +9,8 @@ class Point:
                  v_x: float = None,
                  v_y: float = None,
                  v_z: float = None,
-                 is_in: bool = None):
+                 is_in: bool = None,
+                 in_capillary: bool = None):
         if x is not None:
             self.x: float = x  # x coordinate
         if y is not None:
@@ -24,6 +25,8 @@ class Point:
             self.v_z: float = v_z  # z velocity
         if is_in is not None:
             self.is_in: bool = is_in
+        if in_capillary is not None:
+            self.in_capillary: bool = in_capillary
         pass
 
     def __deepcopy__(self, memodict={}):
