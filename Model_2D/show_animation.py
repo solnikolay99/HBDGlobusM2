@@ -39,7 +39,8 @@ def update(frame):
     ax.imshow(mask)
     current_datetime = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     if saving:
-        plt.savefig(str(directory_path) + '/profs/prof' + str(current_datetime) + '.png', dpi=600, bbox_inches='tight')
+        # plt.savefig(str(directory_path) + '/profs/prof' + str(current_datetime) + '.png', dpi=600, bbox_inches='tight')
+        plt.savefig(str(directory_path) + '/profs/prof' + str(current_datetime) + '.png', dpi=100, bbox_inches='tight')
         print(f'{frame} frame was saved')
 
 

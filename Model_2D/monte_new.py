@@ -5,9 +5,8 @@
 import copy
 import datetime
 import os
-import time
-import pickle
 import shutil
+import time
 
 import cv2
 import matplotlib.pyplot as plt
@@ -45,17 +44,20 @@ def inverse_maxwell_distribution(x):
     return np.sqrt(k_t_m_hel * np.log(1 - x)) * denominator
 
 
-def calc_point_velocities(points: list[Point]) -> list[list]:
+def calc_point_velocities(points: list[Point]) -> (list[list], float):
     part_len = len(points)
     pairs = []
+    velocity_max = 0
     for j in range(part_len):
         for i in range(j + 1, part_len):
-            pairs.append([np.sqrt((points[i].v_x - points[j].v_x) * (points[i].v_x - points[j].v_x)
-                                  + (points[i].v_y - points[j].v_y) * (
-                                          points[i].v_y - points[j].v_y)),
+            vel_square = np.sqrt((points[i].v_x - points[j].v_x) * (points[i].v_x - points[j].v_x) +
+                                 (points[i].v_y - points[j].v_y) * (points[i].v_y - points[j].v_y))
+            if vel_square > velocity_max:
+                velocity_max = vel_square
+            pairs.append([vel_square,
                           points[i],
                           points[j]])
-    return pairs
+    return pairs, velocity_max
 
 
 def new_velocity(coeff_x: int, coeff_y: int, vx: float, vy: float) -> (float, float):
@@ -200,7 +202,7 @@ def split_to_cells(points: list[Point]) -> dict[str, list[Point]]:
             '''
 
             # Добавление частиц в расчетную сетку для метода Монте-Карло
-            if points[j].x > 0 or j < ln:
+            if points[j].v_x > 0 or j < ln:
                 key = f"{round(points[j].y)}_{round(points[j].x)}"
                 if key not in grid_dict:
                     grid_dict[key] = [points[j]]
@@ -212,13 +214,11 @@ def split_to_cells(points: list[Point]) -> dict[str, list[Point]]:
 
 def iterate_over_grid(grid: dict[str, list[Point]]):
     for cell_points in grid.values():
-        if len(cell_points) >= 2:
-            point_pairs = calc_point_velocities(cell_points)
-            velocity_squares = [point_pair[0] for point_pair in point_pairs]
-            max_element = np.max(velocity_squares)
+        if len(cell_points) > 1:
+            point_pairs, vel_square_max = calc_point_velocities(cell_points)
 
             for point_pair in point_pairs:
-                if point_pair[0] > max_element * randoms_1.get_next():
+                if point_pair[0] > vel_square_max * randoms_1.get_next():
                     zn1 = np.sign(randoms_mp1.get_next())
                     zn2 = np.sign(randoms_mp1.get_next())
                     angle = 2 * np.pi * randoms_1.get_next()
@@ -235,7 +235,7 @@ def iterate_over_grid(grid: dict[str, list[Point]]):
 
 
 def checking_boundaries(points: list[Point]):
-    for j in range(1, size):
+    for j in range(len(points)):
         if points[j].is_in:
             a = aperture_mask[round(m * points[j].y), round(m * points[j].x)]
 
@@ -279,12 +279,12 @@ def checking_boundaries(points: list[Point]):
 
         if points[j].v_x > max_velocity:
             points[j].v_x = max_velocity
+        elif points[j].v_x < min_velocity:
+            points[j].v_x = min_velocity
+
         if points[j].v_y > max_velocity:
             points[j].v_y = max_velocity
-
-        if points[j].v_x < min_velocity:
-            points[j].v_x = min_velocity
-        if points[j].v_y < min_velocity:
+        elif points[j].v_y < min_velocity:
             points[j].v_y = min_velocity
 
         points[j].x += points[j].v_x * t_step
@@ -302,28 +302,27 @@ def checking_boundaries(points: list[Point]):
                 if (cond1 or cond2) and cond5:
                     points[j].v_y = -points[j].v_y
                     points[j].y += points[j].v_y * t_step
-
-                if (cond1 or cond2) and not cond5:
+                elif (cond1 or cond2) and not cond5:
                     if cond1:
                         points[j].y = shape_y - bias
-                    if cond2:
+                    elif cond2:
                         points[j].y = bias
-                    if cond3:
+                    elif cond3:
                         points[j].x = shape_x - bias
 
                 if cond3:
                     points[j].is_in = False
                     points[j].x = shape_x - bias
-                if cond4:
+                elif cond4:
                     points[j].v_x = -points[j].v_x
             else:
                 if cond1:
                     points[j].y = shape_y - bias
-                if cond2:
+                elif cond2:
                     points[j].y = bias
                 if cond3:
                     points[j].x = shape_x - bias
-                if cond4:
+                elif cond4:
                     points[j].x = x_min_lim
     pass
 
@@ -336,12 +335,10 @@ def dump_to_file(timestamp: datetime, frames: list[list[Point]]):
     filename_mask1 = 'data/mask.npy'
     filename_coord_x1 = 'data/coord_x.npy'
     filename_coord_y1 = 'data/coord_y.npy'
-    filename_time_frames1 = 'data/timeframes.pkl'
     params_tmpl = f"{shape_x}_time={time_steps}_len={size}_height={height}_bias={bias}_thresh={capillary_length}_{cur_date_str}"
     filename_mask2 = f"{out_folder}/mask_sh={params_tmpl}.npy"
     filename_coord_x2 = f"{out_folder}/coord_x_sh={params_tmpl}.npy"
     filename_coord_y2 = f"{out_folder}/coord_y_sh={params_tmpl}.npy"
-    filename_time_frames2 = f"{out_folder}/timeframes={params_tmpl}.pkl"
 
     start_timer('Convert to old arrays')
     coord_x = np.zeros((full_size, time_steps))
@@ -362,11 +359,16 @@ def dump_to_file(timestamp: datetime, frames: list[list[Point]]):
     np.save(filename_mask1, aperture_mask)
     shutil.copyfile(filename_mask1, filename_mask2)
 
+    '''
+    filename_time_frames1 = 'data/timeframes.pkl'
+    filename_time_frames2 = f"{out_folder}/timeframes={params_tmpl}.pkl"
+    
     start_timer('Dump new array')
     with open(filename_time_frames1, 'wb') as out_file:
         pickle.dump(frames, out_file)
     shutil.copyfile(filename_time_frames1, filename_time_frames2)
     release_timer('Dump new array')
+    '''
 
     pass
 
@@ -441,5 +443,4 @@ if __name__ == '__main__':
     dump_to_file(datetime.datetime.now(), time_frames)
 
     # Вывод траекторий, если требуется
-    if True:
-        plot_trajectories()
+    # plot_trajectories()
