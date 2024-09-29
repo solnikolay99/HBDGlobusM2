@@ -4,9 +4,11 @@
 
 import copy
 import datetime
+import math
 import os
 import shutil
 import time
+from threading import Thread
 
 import cv2
 import matplotlib.pyplot as plt
@@ -28,7 +30,8 @@ def start_timer(timer_name: str):
 
 
 def release_timer(timer_name: str):
-    print(f"Execution time for '{timer_name}' is {time.time() - timers[timer_name]:.4f}")
+    if debug:
+        print(f"Execution time for '{timer_name}' is {time.time() - timers[timer_name]:.4f}")
     pass
 
 
@@ -40,7 +43,7 @@ def initiate_randoms():
     pass
 
 
-def inverse_maxwell_distribution(x):
+def inverse_maxwell_distribution(x: float) -> float:
     return np.sqrt(k_t_m_hel * np.log(1 - x)) * denominator
 
 
@@ -132,7 +135,7 @@ def initiate_points(count_points: int, max_length: int, y_size: int, half_height
                   # z=0,
                   v_x=0,
                   v_y=0,
-                  v_z=0,
+                  # v_z=0,
                   is_in=True,
                   in_capillary=True) for i in range(count_points)]
 
@@ -209,7 +212,7 @@ def split_to_cells(points: list[Point]) -> dict[str, list[Point]]:
     return grid_dict
 
 
-def iterate_over_grid(grid: dict[str, list[Point]]):
+def _iterate_over_grid(grid: dict[str, list[Point]]):
     for cell_points in grid.values():
         if len(cell_points) > 1:
             point_pairs, vel_square_max = calc_point_velocities(cell_points)
@@ -231,47 +234,67 @@ def iterate_over_grid(grid: dict[str, list[Point]]):
     pass
 
 
-def checking_boundaries(points: list[Point]):
+def iterate_over_grid(grid: dict[str, list[Point]]):
+    if use_multithread:
+        threads = []
+        keys = list(grid.keys())
+        range_per_thread = math.ceil(len(keys) / thread_count)
+        for i in range(thread_count):
+            part_grid = {}
+            for key in keys[i * range_per_thread:(i + 1) * range_per_thread]:
+                part_grid[key] = grid.get(key)
+            thread = Thread(target=_iterate_over_grid, args=(part_grid,))
+            threads.append(thread)
+            thread.start()
+        for thread in threads:
+            thread.join()
+    else:
+        _iterate_over_grid(grid)
+    pass
+
+
+def _checking_boundaries(points: list[Point]):
+    last_frame = len(time_frames) - 1
     for j in range(len(points)):
         if points[j].is_in:
             a = aperture_mask[round(m * points[j].y), round(m * points[j].x)]
 
             if a == 0 or a == 2:
                 points[j].v_x = -points[j].v_x
-                points[j].x = time_frames[t - 1][j].x
-                points[j].y = time_frames[t - 1][j].y
+                points[j].x = time_frames[last_frame - 1][j].x
+                points[j].y = time_frames[last_frame - 1][j].y
 
             elif a == 6:
                 points[j].v_x, points[j].v_y = new_velocity(0, 1, points[j].v_x, points[j].v_y)
-                points[j].x = time_frames[t - 1][j].x
-                points[j].y = time_frames[t - 1][j].y
+                points[j].x = time_frames[last_frame - 1][j].x
+                points[j].y = time_frames[last_frame - 1][j].y
 
             elif a == 8:
                 points[j].v_x, points[j].v_y = new_velocity(0, -1, points[j].v_x, points[j].v_y)
-                points[j].x = time_frames[t - 1][j].x
-                points[j].y = time_frames[t - 1][j].y
+                points[j].x = time_frames[last_frame - 1][j].x
+                points[j].y = time_frames[last_frame - 1][j].y
 
             elif a == 98:
                 points[j].v_y = -points[j].v_y
-                points[j].x = time_frames[t - 1][j].x
-                points[j].y = time_frames[t - 1][j].y
+                points[j].x = time_frames[last_frame - 1][j].x
+                points[j].y = time_frames[last_frame - 1][j].y
 
             '''
             elif a == 124 or a == 176:
                 points[j].v_x, points[j].v_y = new_velocity(-1, 0, points[j].v_x, points[j].v_y)
-                points[j].x = time_frames[t - 1][j].x
-                points[j].y = time_frames[t - 1][j].y
+                points[j].x = time_frames[last_frame - 1][j].x
+                points[j].y = time_frames[last_frame - 1][j].y
 
             if a == 0:
                 points[j].v_x, points[j].v_y = new_velocity(160 - round(points[j].x), 40 - round(points[j].y),
                                                             points[j].v_x, points[j].v_y)
-                points[j].x = time_frames[t - 1][j].x
-                points[j].y = time_frames[t - 1][j].y
+                points[j].x = time_frames[last_frame - 1][j].x
+                points[j].y = time_frames[last_frame - 1][j].y
             elif a == 61:
                 points[j].v_x, points[j].v_y = new_velocity(160 - round(points[j].x), 200 - round(points[j].y),
                                                             points[j].v_x, points[j].v_y)
-                points[j].x = time_frames[t - 1][j].x
-                points[j].y = time_frames[t - 1][j].y
+                points[j].x = time_frames[last_frame - 1][j].x
+                points[j].y = time_frames[last_frame - 1][j].y
             '''
 
         if points[j].v_x > max_velocity:
@@ -324,54 +347,58 @@ def checking_boundaries(points: list[Point]):
     pass
 
 
-def dump_to_file(timestamp: datetime, frames: list[list[Point]]):
+def checking_boundaries(points: list[Point]):
+    if use_multithread:
+        threads = []
+        range_per_thread = math.ceil(len(points) / thread_count)
+        for i in range(0, len(points), range_per_thread):
+            part_points = points[i:i + range_per_thread]
+            thread = Thread(target=_checking_boundaries, args=(part_points,))
+            threads.append(thread)
+            thread.start()
+        for thread in threads:
+            thread.join()
+    else:
+        _checking_boundaries(points)
+    pass
+
+
+def dump_part(frames: list[list[Point]]) -> list[list[Point]]:
+    if cur_time_frame[0] == 0:
+        shutil.rmtree('data/parts', ignore_errors=True)
+        os.makedirs('data/parts', exist_ok=True)
+
+    cur_time_frame[0] += 1
+
+    filename_coord_x = f"data/parts/coord_x_{cur_time_frame[0]:06n}.npy"
+    filename_coord_y = f"data/parts/coord_y_{cur_time_frame[0]:06n}.npy"
+
+    count_frames = dump_every if len(frames) > dump_every else len(frames)
+    coord_x = np.zeros((count_frames, full_size))
+    coord_y = np.zeros((count_frames, full_size))
+
+    for i in range(count_frames):
+        for j in range(len(frames[i])):
+            coord_x[i][j] = frames[i][j].x
+            coord_y[i][j] = frames[i][j].y
+
+    np.save(filename_coord_x, coord_x)
+    np.save(filename_coord_y, coord_y)
+
+    return frames[count_frames:]
+
+
+def dump_mask_to_file(timestamp: datetime):
     cur_date_str = timestamp.strftime('%Y-%m-%d_%H-%M-%S')
 
     os.makedirs(out_folder, exist_ok=True)
 
     filename_mask1 = 'data/mask.npy'
-    filename_coord_x1 = 'data/coord_x.npy'
-    filename_coord_y1 = 'data/coord_y.npy'
     params_tmpl = f"{shape_x}_time={time_steps}_len={size}_height={height}_bias={bias}_thresh={capillary_length}_{cur_date_str}"
     filename_mask2 = f"{out_folder}/mask_sh={params_tmpl}.npy"
-    filename_coord_x2 = f"{out_folder}/coord_x_sh={params_tmpl}.npy"
-    filename_coord_y2 = f"{out_folder}/coord_y_sh={params_tmpl}.npy"
-
-    start_timer('Convert to old arrays')
-    coord_x = np.zeros((full_size, time_steps))
-    coord_y = np.zeros((full_size, time_steps))
-    max_size = 0
-    for i in range(len(frames)):
-        if max_size < len(frames[i]):
-            max_size = len(frames[i])
-        for j in range(len(frames[i])):
-            coord_x[j][i] = frames[i][j].x
-            coord_y[j][i] = frames[i][j].y
-    coord_x = coord_x[:max_size, :]
-    coord_y = coord_y[:max_size, :]
-    release_timer('Convert to old arrays')
-
-    start_timer('Dump old arrays')
-    np.save(filename_coord_x1, coord_x)
-    np.save(filename_coord_y1, coord_y)
-    shutil.copyfile(filename_coord_x1, filename_coord_x2)
-    shutil.copyfile(filename_coord_y1, filename_coord_y2)
-    release_timer('Dump old arrays')
 
     np.save(filename_mask1, aperture_mask)
     shutil.copyfile(filename_mask1, filename_mask2)
-
-    '''
-    filename_time_frames1 = 'data/timeframes.pkl'
-    filename_time_frames2 = f"{out_folder}/timeframes={params_tmpl}.pkl"
-    
-    start_timer('Dump new array')
-    with open(filename_time_frames1, 'wb') as out_file:
-        pickle.dump(frames, out_file)
-    shutil.copyfile(filename_time_frames1, filename_time_frames2)
-    release_timer('Dump new array')
-    '''
-
     pass
 
 
@@ -397,6 +424,9 @@ aperture_mask = mesh(shape_y, shape_x, height, m)  # маска диафрагм
 # folder
 
 if __name__ == '__main__':
+    # Сохранение параметров маски в файл
+    dump_mask_to_file(datetime.datetime.now())
+
     # Задание массивов координат и скоростей
     start_timer('Initiate points')
     list_points = initiate_points(size, capillary_length, shape_y, height)
@@ -435,10 +465,20 @@ if __name__ == '__main__':
         time_frames.append(copy.deepcopy(list_points))
         release_timer('Deep copy into timeframes')
 
+        if len(time_frames) > dump_every + 1:
+            start_timer('Partially dump data')
+            time_frames = dump_part(time_frames)
+            release_timer('Partially dump data')
+
         release_timer('Main cycle')
 
+    if len(time_frames) < dump_every + 1:
+        start_timer('Partially dump data')
+        time_frames = dump_part(time_frames)
+        release_timer('Partially dump data')
+
     # Сохранение координат частиц в файл
-    dump_to_file(datetime.datetime.now(), time_frames)
+    # dump_to_file(datetime.datetime.now(), time_frames)
 
     # Вывод траекторий, если требуется
     # plot_trajectories()

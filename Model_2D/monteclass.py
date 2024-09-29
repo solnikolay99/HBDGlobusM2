@@ -32,24 +32,19 @@ class Point:
     def __deepcopy__(self, memodict={}):
         return Point(self.x, self.y)
 
-    def __getstate__(self) -> dict:
-        return {"x": self.x, "y": self.y}
-
-    def __setstate__(self, state: dict):
-        self.x = state["x"]
-        self.y = state["y"]
-
 
 class AdditParams:
     def __init__(self,
                  v_x: float = 0.0,
                  v_y: float = 0.0,
                  v_z: float = 0.0,
-                 is_in: bool = True):
+                 is_in: bool = True,
+                 in_capillary: bool = True):
         self.v_x: float = v_x  # x velocity
         self.v_y: float = v_y  # y velocity
         self.v_z: float = v_z  # z velocity
         self.is_in: bool = is_in
+        self.in_capillary: bool = in_capillary
         pass
 
 
