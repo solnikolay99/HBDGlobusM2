@@ -22,7 +22,7 @@ def name_reader(dir_path, pattern):
 def update(frame):
     ax.clear()
     ax.scatter(m * coord_x[frame, :], m * coord_y[frame, :], marker='.', s=0.5, color='#ff531f')
-    plt.title(str(0.25 * frame) + ' мкс')
+    plt.title(f"{0.25 * frame * pick_every_timeframe: 6.2f} мкс")
     x, y = int(round(mask.shape[1], -3)), int(round(mask.shape[1], -3))
     numx, numy = 6, 11
     x_ticks = [f'{val:.0f}' if val.is_integer() else f'{val:.1f}'.rstrip('0').rstrip('.') for val in
@@ -40,7 +40,7 @@ def update(frame):
     current_datetime = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     if saving_to_file:
         # plt.savefig(str(directory_path) + '/profs/prof' + str(current_datetime) + '.png', dpi=600, bbox_inches='tight')
-        plt.savefig(str(main_dir_path) + '/profs/prof' + str(current_datetime) + '.png', dpi=100, bbox_inches='tight')
+        plt.savefig(str(main_dir_path) + '/profs/prof' + str(current_datetime) + '.png', dpi=200, bbox_inches='tight')
         print(f'{frame} frame was saved')
 
 
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     m = 1
 
     # directory_path = os.getcwd() + '/008'
-    mask = np.load(sorted(glob.glob(main_dir_path + '/' + 'mask*'))[0])
+    mask = np.load(sorted(glob.glob(parts_dir_path + '/' + 'mask*'))[0])
     coord_x = None
     coord_y = None
     for file_name in name_reader(parts_dir_path, 'coord_x*'):

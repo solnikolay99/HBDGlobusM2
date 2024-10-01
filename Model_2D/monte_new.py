@@ -21,11 +21,12 @@ randoms_1 = Randoms()  # for randoms from [0, 1)
 randoms_2pi = Randoms()  # for randoms from [0, 2*pi)
 randoms_mp1 = Randoms()  # for randoms from [-1, 1)
 
-timers = {}
+timers = {}  # times for profiling app
 
 
 def start_timer(timer_name: str):
-    timers[timer_name] = time.time()
+    if debug:
+        timers[timer_name] = time.time()
     pass
 
 
@@ -100,20 +101,22 @@ def mesh(max_y: int, max_x: int, height: float, multiply: int) -> np.array:
     height *= multiply
     mask = 35 * np.ones((max_y, max_x))
 
+    '''
     aperture_width = 20 * multiply
-    aperture_l2 = int(max_y // 2 - 8 * height)
+    aperture_l2 = int(max_y // 2 - 4 * height)
     x = 160 * multiply
     mask[:aperture_l2, x:x + aperture_width] = wall_mask(aperture_width, aperture_l2)
     mask[max_y - aperture_l2:, x:x + aperture_width] = np.flipud(wall_mask(aperture_width, aperture_l2)) + 2
+    '''
 
     aperture_width = 20 * multiply
-    aperture_l2 = int(max_y // 2 - 8 * height)
+    aperture_l2 = int(max_y // 2 - 4 * height)
     x = 360 * multiply
     mask[:aperture_l2, x:x + aperture_width] = wall_mask(aperture_width, aperture_l2)
     mask[max_y - aperture_l2:, x:x + aperture_width] = np.flipud(wall_mask(aperture_width, aperture_l2)) + 2
 
     aperture_width = 20 * multiply
-    aperture_l2 = int(max_y // 2 - 4 * height)
+    aperture_l2 = int(max_y // 2 - 12 * height)
     x = 560 * multiply
     mask[:aperture_l2, x:x + aperture_width] = wall_mask(aperture_width, aperture_l2)
     mask[max_y - aperture_l2:, x:x + aperture_width] = np.flipud(wall_mask(aperture_width, aperture_l2)) + 2
@@ -255,7 +258,7 @@ def iterate_over_grid(grid: dict[str, list[Point]]):
 
 def _checking_boundaries(points: list[Point]):
     last_frame = len(time_frames) - 1
-    for j in range(len(points)):
+    for j in range(len(points) - 1, -1, -1):
         if points[j].is_in:
             a = aperture_mask[round(m * points[j].y), round(m * points[j].x)]
 
@@ -297,53 +300,57 @@ def _checking_boundaries(points: list[Point]):
                 points[j].y = time_frames[last_frame - 1][j].y
             '''
 
-        if points[j].v_x > max_velocity:
-            points[j].v_x = max_velocity
-        elif points[j].v_x < min_velocity:
-            points[j].v_x = min_velocity
+            if points[j].v_x > max_velocity:
+                points[j].v_x = max_velocity
+            elif points[j].v_x < min_velocity:
+                points[j].v_x = min_velocity
 
-        if points[j].v_y > max_velocity:
-            points[j].v_y = max_velocity
-        elif points[j].v_y < min_velocity:
-            points[j].v_y = min_velocity
+            if points[j].v_y > max_velocity:
+                points[j].v_y = max_velocity
+            elif points[j].v_y < min_velocity:
+                points[j].v_y = min_velocity
 
-        points[j].x += points[j].v_x * t_step
-        points[j].y += points[j].v_y * t_step
+            points[j].x += points[j].v_x * t_step
+            points[j].y += points[j].v_y * t_step
 
-        if not points[j].in_capillary:
+            if not points[j].in_capillary:
 
-            cond1 = points[j].y > shape_y - bias
-            cond2 = points[j].y < bias
-            cond3 = points[j].x > shape_x - bias
-            cond4 = points[j].x < x_min_lim
-            cond5 = points[j].x < 159 + 400
+                cond1 = points[j].y > shape_y - bias
+                cond2 = points[j].y < bias
+                cond3 = points[j].x > shape_x - bias
+                cond4 = points[j].x < x_min_lim
+                cond5 = points[j].x < 159 + 400
 
-            if wall_tube:
-                if (cond1 or cond2) and cond5:
-                    points[j].v_y = -points[j].v_y
-                    points[j].y += points[j].v_y * t_step
-                elif (cond1 or cond2) and not cond5:
-                    if cond1:
-                        points[j].y = shape_y - bias
-                    elif cond2:
-                        points[j].y = bias
-                    elif cond3:
+                if wall_tube:
+                    if (cond1 or cond2) and cond5:
+                        points[j].v_y = -points[j].v_y
+                        points[j].y += points[j].v_y * t_step
+                    elif (cond1 or cond2) and not cond5:
+                        if cond1:
+                            points[j].y = shape_y - bias
+                        elif cond2:
+                            points[j].y = bias
+                        elif cond3:
+                            points[j].x = shape_x - bias
+
+                    if cond3:
+                        points[j].is_in = False
                         points[j].x = shape_x - bias
-
-                if cond3:
-                    points[j].is_in = False
-                    points[j].x = shape_x - bias
-                elif cond4:
-                    points[j].v_x = -points[j].v_x
-            else:
-                if cond1:
-                    points[j].y = shape_y - bias
-                elif cond2:
-                    points[j].y = bias
-                if cond3:
-                    points[j].x = shape_x - bias
-                elif cond4:
-                    points[j].x = x_min_lim
+                    elif cond4:
+                        points[j].v_x = -points[j].v_x
+                else:
+                    if cond1 and cond5:
+                        points[j].y = shape_y - bias
+                        points[j].is_in = False
+                    elif cond2 and cond5:
+                        points[j].y = bias
+                        points[j].is_in = False
+                    if cond3:
+                        points[j].x = shape_x - bias
+                        points[j].is_in = False
+                    elif cond4 and cond5:
+                        points[j].x = x_min_lim
+                        points[j].v_x = -points[j].v_x
     pass
 
 
@@ -365,13 +372,17 @@ def checking_boundaries(points: list[Point]):
 
 def dump_part(frames: list[list[Point]]) -> list[list[Point]]:
     if cur_time_frame[0] == 0:
-        shutil.rmtree('data/parts', ignore_errors=True)
-        os.makedirs('data/parts', exist_ok=True)
+        shutil.rmtree(data_folder, ignore_errors=True)
+        os.makedirs(data_folder, exist_ok=True)
+
+    # Сохранение параметров маски в файл
+    if not os.path.exists(data_folder + '/mask.npy'):
+        np.save(data_folder + '/mask.npy', aperture_mask)
 
     cur_time_frame[0] += 1
 
-    filename_coord_x = f"data/parts/coord_x_{cur_time_frame[0]:06n}.npy"
-    filename_coord_y = f"data/parts/coord_y_{cur_time_frame[0]:06n}.npy"
+    filename_coord_x = f"{data_folder}/coord_x_{cur_time_frame[0]:06n}.npy"
+    filename_coord_y = f"{data_folder}/coord_y_{cur_time_frame[0]:06n}.npy"
 
     count_frames = dump_every if len(frames) > dump_every else len(frames)
     coord_x = np.zeros((count_frames, full_size))
@@ -388,17 +399,16 @@ def dump_part(frames: list[list[Point]]) -> list[list[Point]]:
     return frames[count_frames:]
 
 
-def dump_mask_to_file(timestamp: datetime):
-    cur_date_str = timestamp.strftime('%Y-%m-%d_%H-%M-%S')
+def duplicate_dumped_data(cur_date: datetime):
+    cur_date_str = cur_date.strftime('%Y-%m-%d_%H-%M-%S')
 
     os.makedirs(out_folder, exist_ok=True)
 
-    filename_mask1 = 'data/mask.npy'
-    params_tmpl = f"{shape_x}_time={time_steps}_len={size}_height={height}_bias={bias}_thresh={capillary_length}_{cur_date_str}"
-    filename_mask2 = f"{out_folder}/mask_sh={params_tmpl}.npy"
+    duplicate_folder_path = f"{out_folder}/{cur_date_str}_mask_sh={shape_x}_time={time_steps}" \
+                            f"_len={size}_height={height}_bias={bias}_thresh={capillary_length}"
 
-    np.save(filename_mask1, aperture_mask)
-    shutil.copyfile(filename_mask1, filename_mask2)
+    shutil.copytree(data_folder, duplicate_folder_path)
+
     pass
 
 
@@ -424,9 +434,6 @@ aperture_mask = mesh(shape_y, shape_x, height, m)  # маска диафрагм
 # folder
 
 if __name__ == '__main__':
-    # Сохранение параметров маски в файл
-    dump_mask_to_file(datetime.datetime.now())
-
     # Задание массивов координат и скоростей
     start_timer('Initiate points')
     list_points = initiate_points(size, capillary_length, shape_y, height)
@@ -442,7 +449,7 @@ if __name__ == '__main__':
 
     # Проход по временному циклу
     for t in range(1, time_steps):
-        print(size, ' - len,', t, ' - time step')
+        print(datetime.datetime.now().strftime('%H:%M:%S.%f'), '   ', size, ' - len,', t, ' - time step')
 
         start_timer('Main cycle')
 
@@ -461,6 +468,8 @@ if __name__ == '__main__':
         checking_boundaries(list_points)
         release_timer('Checking boundaries')
 
+        # print('>>> Len points is', len(list_points))
+
         start_timer('Deep copy into timeframes')
         time_frames.append(copy.deepcopy(list_points))
         release_timer('Deep copy into timeframes')
@@ -478,7 +487,7 @@ if __name__ == '__main__':
         release_timer('Partially dump data')
 
     # Сохранение координат частиц в файл
-    # dump_to_file(datetime.datetime.now(), time_frames)
+    duplicate_dumped_data(datetime.datetime.now())
 
     # Вывод траекторий, если требуется
     # plot_trajectories()

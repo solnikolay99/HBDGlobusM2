@@ -1,13 +1,14 @@
-debug = True  # debug flag
+debug = False  # debug flag
 
 # Задание параметров
 shape_x = 1000  # высота расчетной области
 shape_y = 240  # ширина расчетной области
 
-time_steps = 2000  # количество временных шагов
-size = int(1e3)  # количество частиц
-full_size = int(2e3)  # количество частиц с учетом дублирования частиц
-wall_tube = 1
+time_steps = 5000  # количество временных шагов
+size = int(2e4)  # количество частиц
+full_size = int(2e4)  # количество частиц с учетом дублирования частиц
+wall_tube = False
+data_folder = 'data/parts'
 out_folder = 'calculation/001'
 
 ln = size
@@ -32,7 +33,7 @@ use_multithread = False
 thread_count = 6
 
 # dump params
-dump_every = 100
+dump_every = 1000
 cur_time_frame = [0]
 
 # pre-calculations for check_walls
