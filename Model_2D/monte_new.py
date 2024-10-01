@@ -25,8 +25,7 @@ timers = {}  # times for profiling app
 
 
 def start_timer(timer_name: str):
-    if debug:
-        timers[timer_name] = time.time()
+    timers[timer_name] = time.time()
     pass
 
 
@@ -339,16 +338,18 @@ def _checking_boundaries(points: list[Point]):
                     elif cond4:
                         points[j].v_x = -points[j].v_x
                 else:
-                    if cond1 and cond5:
+                    if cond1:
                         points[j].y = shape_y - bias
-                        points[j].is_in = False
-                    elif cond2 and cond5:
+                        if cond5:
+                            points[j].is_in = False
+                    elif cond2:
                         points[j].y = bias
-                        points[j].is_in = False
+                        if cond5:
+                            points[j].is_in = False
                     if cond3:
                         points[j].x = shape_x - bias
                         points[j].is_in = False
-                    elif cond4 and cond5:
+                    elif cond4:
                         points[j].x = x_min_lim
                         points[j].v_x = -points[j].v_x
     pass
@@ -381,20 +382,16 @@ def dump_part(frames: list[list[Point]]) -> list[list[Point]]:
 
     cur_time_frame[0] += 1
 
-    filename_coord_x = f"{data_folder}/coord_x_{cur_time_frame[0]:06n}.npy"
-    filename_coord_y = f"{data_folder}/coord_y_{cur_time_frame[0]:06n}.npy"
+    filename_coords = f"{data_folder}/coords_{cur_time_frame[0]:06n}.npy"
 
     count_frames = dump_every if len(frames) > dump_every else len(frames)
-    coord_x = np.zeros((count_frames, full_size))
-    coord_y = np.zeros((count_frames, full_size))
+    coords = np.zeros((count_frames, full_size, 2))
 
     for i in range(count_frames):
         for j in range(len(frames[i])):
-            coord_x[i][j] = frames[i][j].x
-            coord_y[i][j] = frames[i][j].y
+            coords[i][j] = [frames[i][j].x, frames[i][j].y]
 
-    np.save(filename_coord_x, coord_x)
-    np.save(filename_coord_y, coord_y)
+    np.save(filename_coords, coords)
 
     return frames[count_frames:]
 
@@ -449,8 +446,6 @@ if __name__ == '__main__':
 
     # Проход по временному циклу
     for t in range(1, time_steps):
-        print(datetime.datetime.now().strftime('%H:%M:%S.%f'), '   ', size, ' - len,', t, ' - time step')
-
         start_timer('Main cycle')
 
         # Проход по частицам
@@ -480,6 +475,9 @@ if __name__ == '__main__':
             release_timer('Partially dump data')
 
         release_timer('Main cycle')
+
+        print(f"Time step: {t: 5n}; count points: {len(list_points): 6n};"
+              f" iteration exec time: {time.time() - timers['Main cycle']:.4f}")
 
     if len(time_frames) < dump_every + 1:
         start_timer('Partially dump data')
