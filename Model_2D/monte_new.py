@@ -319,8 +319,9 @@ def _checking_boundaries(points: list[Point], out_points: list):
             '''
             Соответствие цветов (в Paint) в числами в маске
             0 - black. Любая поверхность, от которой точка должна отражаться строго назад по x.
-            34 - green. Наклонённая на 20 градусов поверхность.
+            34 - green. Наклонённая на 90+20 градусов поверхность.
             127 - gray. Любая поверхность, от которой точка должна отражаться строго назад по y.
+            237 - red. Наклонённая на 90-20 градусов поверхность.
             255 - white. Действия отсутствуют.
             '''
             if mask_point == 255 or points[j].in_capillary:
@@ -333,11 +334,17 @@ def _checking_boundaries(points: list[Point], out_points: list):
                     points[j].v_x = -points[j].v_x
 
                 elif mask_point == 34:
-                    points[j].v_x = np.cos(np.pi * 0.5 + np.radians(20)) * points[j].v_x
-                    points[j].v_y = np.sin(np.pi * 0.5 + np.radians(20)) * points[j].v_y
+                    vel_square = np.sqrt((points[j].v_x * points[j].v_x + points[j].v_y * points[j].v_y))
+                    points[j].v_x = vel_square * np.cos(np.pi * 0.5 + np.radians(20))
+                    points[j].v_y = vel_square * np.sin(np.pi * 0.5 + np.radians(20))
 
                 elif mask_point == 127:
                     points[j].v_y = -points[j].v_y
+
+                elif mask_point == 237:
+                    vel_square = np.sqrt((points[j].v_x * points[j].v_x + points[j].v_y * points[j].v_y))
+                    points[j].v_x = vel_square * np.cos(np.pi * 0.5 + np.radians(20))
+                    points[j].v_y = -vel_square * np.sin(np.pi * 0.5 + np.radians(20))
 
                 new_x, new_y, mask_x, mask_y =\
                     get_new_coords(points[j].x, points[j].y, coeff * points[j].v_x, coeff * points[j].v_y)
@@ -372,26 +379,6 @@ def _checking_boundaries(points: list[Point], out_points: list):
                     elif cond4:
                         points[j].v_x = -points[j].v_x
                 else:
-                    '''
-                    if cond1:
-                        points[j].y = shape_y - bias
-                        if cond5:
-                            points[j].is_in = False
-                        else:
-                            points[j].v_y = -points[j].v_y
-                    elif cond2:
-                        points[j].y = bias
-                        if cond5:
-                            points[j].is_in = False
-                        else:
-                            points[j].v_y = -points[j].v_y
-                    if cond3:
-                        points[j].x = shape_x - bias
-                        points[j].is_in = False
-                    elif cond4:
-                        points[j].x = x_min_lim
-                        points[j].v_x = -points[j].v_x
-                    '''
                     if cond1:
                         points[j].y = shape_y - bias
                         points[j].is_in = False
