@@ -10,7 +10,7 @@ import numpy as np
 
 
 def name_reader(directory_path, pattern):
-    return sorted(glob.glob(directory_path + '/' + pattern))[:]
+    return sorted(glob.glob(directory_path + '\\' + pattern))[:]
 
 
 def save(folder, name):
@@ -19,9 +19,9 @@ def save(folder, name):
 
     mask = np.load(matching_file[0])
     limit = 600000
-    file_paths = name_reader(directory_path, 'coorx*')
+    file_paths = name_reader(directory_path, 'coord_x*')
     coorx = np.concatenate([np.load(file_path)[:limit, :] for file_path in file_paths], axis=0)
-    file_paths = name_reader(directory_path, 'coory*')
+    file_paths = name_reader(directory_path, 'coord_y*')
     coory = np.concatenate([np.load(file_path)[:limit, :] for file_path in file_paths], axis=0)
     ln = coory.shape[0]
     print(ln)
@@ -43,5 +43,5 @@ def save(folder, name):
 
 
 if __name__ == '__main__':
-    save('/008', 'data/008')
-    # save('/now', 'data/now')
+    #save('/008', 'data/008')
+    save('\\data', 'data/now')

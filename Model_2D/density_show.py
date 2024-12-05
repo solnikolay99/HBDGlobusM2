@@ -64,7 +64,8 @@ window_size = 25
 
 
 if __name__ == '__main__':
-    name = '008'
+    #name = '008'
+    name = 'now'
     lab = '2D'
     slice = load(name + '.npy', lab, 480, sigma)[:, 480]
     kernel = np.ones(window_size) / window_size

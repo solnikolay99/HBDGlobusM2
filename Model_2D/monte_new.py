@@ -7,6 +7,7 @@ import datetime
 import math
 import os
 import pickle
+import random
 import shutil
 import time
 from threading import Thread
@@ -166,6 +167,8 @@ def split_to_cells(points: list[Point]) -> dict[str, list[Point]]:
                 else:
                     points[j].v_x = V_pot
                     points[j].v_y = 1
+                    points[j].x += points[j].v_x * t_step
+                    points[j].y += points[j].v_y * t_step
                 points[j] = check_capillary(points[j])
 
             # Размножение частиц
@@ -205,19 +208,22 @@ def split_to_cells(points: list[Point]) -> dict[str, list[Point]]:
                             if c_cond3 and di3_cond:
                                 di[2] += 1
 
-            # Добавление частиц в расчетную сетку для метода Монте-Карло
-            if points[j].v_x > 0 or j < full_size:
-                key = f"{round(points[j].y)}_{round(points[j].x)}"
+            if not points[j].in_capillary:
+                # Добавление частиц в расчетную сетку для метода Монте-Карло
+                #if points[j].v_x > 0 or j < full_size:
+                key = f"{int(points[j].x)}_{int(points[j].y)}"
                 if key not in grid_dict:
                     grid_dict[key] = [points[j]]
                 else:
-                    if len(grid_dict[key]) < max_points_per_cell:
-                        grid_dict[key].append(points[j])
+                    grid_dict[key].append(points[j])
     return grid_dict
 
 
 def _iterate_over_grid(grid: dict[str, list[Point]]):
     for cell_points in grid.values():
+        if len(cell_points) > max_points_per_cell:
+            random.shuffle(cell_points)
+            cell_points = cell_points[:max_points_per_cell]
         if len(cell_points) > 1:
             point_pairs, vel_square_max = calc_point_velocities(cell_points)
 
@@ -261,8 +267,8 @@ def get_new_coords(x: float, y: float, v_x: float, v_y: float) -> (float, float,
     new_x = x + v_x * t_step
     new_y = y + v_y * t_step
 
-    mask_x = round(m * new_x)
-    mask_y = round(m * new_y)
+    mask_x = int(m * new_x)
+    mask_y = int(m * new_y)
 
     if mask_x < 0:
         mask_x = 0
@@ -283,16 +289,16 @@ def find_point_of_intersection(point: Point, new_x: float, new_y: float, mask: n
     x_length = abs(point.x - new_x)
     y_length = abs(point.y - new_y)
     if x_length > y_length:
-        count_steps = int(round(x_length))
+        count_steps = int(int(x_length))
     else:
-        count_steps = int(round(y_length))
+        count_steps = int(int(y_length))
     if count_steps == 0:
         return point.x, point.y, 1.0
     x_step = x_length / count_steps
     y_step = y_length / count_steps
     for i in range(count_steps - 1, 0, -1):
-        test_x = round(m * (new_x - x_step * i))
-        test_y = round(m * (new_y - y_step * i))
+        test_x = int(m * (new_x - x_step * i))
+        test_y = int(m * (new_y - y_step * i))
         mask_point = mask[test_y, test_x]
         if mask_point == 255:
             return test_x, test_y, 1 - i / count_steps
@@ -469,8 +475,8 @@ def plot_trajectories():
 
 # Считывание маски диафрагмы
 aperture_mask_tmpl = read_mask()
-# aperture_mask = mesh(shape_y, shape_x, height, m)  # маска диафрагмы
-aperture_mask = aperture_mask_tmpl  # + aperture_mask
+aperture_mask = mesh(shape_y, shape_x, height, m)  # маска диафрагмы
+#aperture_mask = aperture_mask_tmpl  # + aperture_mask
 
 # aperture_mask[aperture_mask == 220] = 290
 uniq_colors = np.unique(aperture_mask)
