@@ -27,7 +27,7 @@ def start_timer():
 
 
 def release_timer(timer_name: str, time_data: time):
-    print(f"Execution time for '{timer_name}' is {time.time() - time_data:.4f}")
+    # print(f"Execution time for '{timer_name}' is {time.time() - time_data:.4f}")
     pass
 
 
@@ -56,6 +56,12 @@ def pars_in_file(f_name: str) -> dict[str, any]:
         elif params[0].strip() == 'create_box':
             out_params['width'] = int(float(params[2].strip()) - float(params[1].strip())) * multiplayer
             out_params['height'] = int(float(params[4].strip()) - float(params[3].strip())) * multiplayer
+            out_params['x_dim_lo'] = int(float(params[1].strip()) * multiplayer)
+            out_params['x_dim_hi'] = int(float(params[2].strip()) * multiplayer)
+            out_params['y_dim_lo'] = int(float(params[3].strip()) * multiplayer)
+            out_params['y_dim_hi'] = int(float(params[4].strip()) * multiplayer)
+            out_params['z_dim_lo'] = int(float(params[5].strip()) * multiplayer)
+            out_params['z_dim_hi'] = int(float(params[6].strip()) * multiplayer)
         elif params[0].strip() == 'read_surf':
             if 'surfs' not in out_params:
                 out_params['surfs'] = []
@@ -72,10 +78,15 @@ def pars_data(f_name: str) -> list[list[float]]:
     headers = header.replace('ITEM: ATOMS ', '').strip().split(' ')
     points = []
     for line in lines:
+        x, y, z = 0, 0, 0
         params = line.strip().split(' ')
-        points.append([float(params[headers.index('x')]) * multiplayer,
-                       float(params[headers.index('y')]) * multiplayer,
-                       int(params[headers.index('id')])])
+        if 'x' in headers:
+            x = float(params[headers.index('x')]) * multiplayer
+        if 'y' in headers:
+            y = float(params[headers.index('y')]) * multiplayer
+        if 'z' in headers:
+            z = float(params[headers.index('z')]) * multiplayer
+        points.append([x, y, z, int(params[headers.index('id')])])
 
     return points
 
@@ -321,8 +332,6 @@ def separate_points_by_kn(timeframe: list[list[float]]) -> list[dict[str, list[l
 
 
 def separate_points_by_density(timeframe: list[list[float]]) -> list[dict[str, list[list[float]]]]:
-    global max_used_cells
-
     fnum = float(global_params.get('fnum'))
     # fnum = 1e0
 
@@ -330,45 +339,43 @@ def separate_points_by_density(timeframe: list[list[float]]) -> list[dict[str, l
         {
             'color': '#ff531f',
             'legend': f'N <  {2 * fnum:.0e}',
-            'points': [[], []]
+            'points': [[], [], []]
         },
         {
             'color': '#00A2E8',
             'legend': f'{2 * fnum:.0e} ≤ N < {4 * fnum:.0e}',
-            'points': [[], []]
+            'points': [[], [], []]
         },
         {
             'color': '#0000ff',
             'legend': f'{4 * fnum:.0e} ≤ N < {6 * fnum:.0e}',
-            'points': [[], []]
+            'points': [[], [], []]
         },
         {
             'color': '#000000',
             'legend': f'{6 * fnum:.0e} ≤ N < {8 * fnum:.0e}',
-            'points': [[], []]
+            'points': [[], [], []]
         },
         {
             'color': '#ffffff',
             'legend': f'{8 * fnum:.0e} ≤ N < {10 * fnum:.0e}',
-            'points': [[], []]
+            'points': [[], [], []]
         },
         {
             'color': '#00ff00',
             'legend': f'N ≥ {10 * fnum:.0e}',
-            'points': [[], []]
+            'points': [[], [], []]
         },
     ]
 
     grid = dict()
     for point in timeframe:
-        key = f'{int(point[0] / (0.05 * multiplayer))}_{int(point[1] / (0.05 * multiplayer))}'
+        key = f'{int(point[0] / (0.05 * multiplayer))}_{int(point[1] / (0.05 * multiplayer))}_{int(point[2] / (0.05 * multiplayer))}'
         if key not in grid:
-            grid[key] = [[], []]
+            grid[key] = [[], [], []]
         grid[key][0].append(point[0])
         grid[key][1].append(point[1])
-
-    if len(grid.keys()) > max_used_cells:
-        max_used_cells = len(grid.keys())
+        grid[key][2].append(point[2])
 
     for key in grid.keys():
         po = len(grid[key][0])
@@ -378,31 +385,43 @@ def separate_points_by_density(timeframe: list[list[float]]) -> list[dict[str, l
                 out_graph[0]['points'][0].append(point)
             for point in grid[key][1]:
                 out_graph[0]['points'][1].append(point)
+            for point in grid[key][2]:
+                out_graph[0]['points'][2].append(point)
         elif 2 <= po < 4:
             for point in grid[key][0]:
                 out_graph[1]['points'][0].append(point)
             for point in grid[key][1]:
                 out_graph[1]['points'][1].append(point)
+            for point in grid[key][2]:
+                out_graph[1]['points'][2].append(point)
         elif 4 <= po < 6:
             for point in grid[key][0]:
                 out_graph[2]['points'][0].append(point)
             for point in grid[key][1]:
                 out_graph[2]['points'][1].append(point)
+            for point in grid[key][2]:
+                out_graph[2]['points'][2].append(point)
         elif 6 <= po < 8:
             for point in grid[key][0]:
                 out_graph[3]['points'][0].append(point)
             for point in grid[key][1]:
                 out_graph[3]['points'][1].append(point)
+            for point in grid[key][2]:
+                out_graph[3]['points'][2].append(point)
         elif 8 <= po < 10:
             for point in grid[key][0]:
                 out_graph[4]['points'][0].append(point)
             for point in grid[key][1]:
                 out_graph[4]['points'][1].append(point)
+            for point in grid[key][2]:
+                out_graph[4]['points'][2].append(point)
         else:
             for point in grid[key][0]:
                 out_graph[5]['points'][0].append(point)
             for point in grid[key][1]:
                 out_graph[5]['points'][1].append(point)
+            for point in grid[key][2]:
+                out_graph[5]['points'][2].append(point)
 
     return out_graph
 
@@ -422,7 +441,14 @@ def update(frame):
         timestep = float(global_params.get('timestep'))
 
         ax1.clear()
+        ax1.set_xlabel("x")
+        ax1.set_ylabel("y")
+        ax1.set_zlabel("z")
+        ax1.set_xlim(global_params['x_dim_lo'], global_params['x_dim_hi'])
+        ax1.set_ylim(global_params['y_dim_lo'], global_params['y_dim_hi'])
+        ax1.set_zlim(global_params['z_dim_lo'], global_params['z_dim_hi'])
         ax1.set_title(f"{(timestep * 1e6 * frame): 6.2f} мкс")
+        #ax1.view_init(180, 0)
         # graphs = separate_points_by_kn(timeframe)
         graphs = separate_points_by_density(timeframe)
 
@@ -431,7 +457,7 @@ def update(frame):
                 ax1.scatter(graph['points'][0], graph['points'][1],
                             marker='.', s=0.5, color=graph['color'], label=graph['legend'])
 
-        ax1.legend(bbox_to_anchor=(0, -0.8, 1, -0.1), loc="lower left",
+        ax1.legend(bbox_to_anchor=(0, -0.8, 1, -0.2), loc="lower left",
                    mode="expand", borderaxespad=0, ncol=3, facecolor="darkgreen")
 
         fnum = float(global_params.get('fnum'))
@@ -465,24 +491,24 @@ def update(frame):
     except Exception:
         print(traceback.format_exc())
 
-    ax1.imshow(mask, extent=[0, mask.width, 0, mask.height])
+    #ax1.imshow(mask, extent=[0, mask.width, 0, mask.height])
 
-    if frame == 20000:
+    if frame == 200:
         plt.savefig(os.path.join(os.getcwd(), 'data', 'last_frame.png'))
 
     print(f'{frame} frame')
 
 
 if __name__ == '__main__':
-    main_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\sparta_git\\textor'
+    main_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\temp_sparta\\textor'
     #parts_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\cache\\'
-    parts_dir_path = 'D:\\dumps\\'
+    parts_dir_path = 'D:\\temp_dumps\\'
 
     pick_every_timeframe = 100
     saving_to_file = 1
     density_smoothing = 8
 
-    global_params = pars_in_file(os.path.join(main_dir_path, 'in.step.temp'))
+    global_params = pars_in_file(os.path.join(main_dir_path, 'in.step'))
     width, height = global_params['width'], global_params['height']
     print(f'width = {width}, height = {height}')
 
@@ -494,14 +520,15 @@ if __name__ == '__main__':
     data_files = name_reader(parts_dir_path, 'dump.*.txt')
     density_labels, density_values, density_point_ids = [], [], dict()
     uniq_points, last_uniq_points = set(), set()
-    max_used_cells = 0
 
-    #data_files = data_files[:501]
+    data_files = data_files[:201]
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6), width_ratios=[2, 1])
+    #fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6), width_ratios=[3, 1], subplot_kw={'projection': '3d'})
+    fig = plt.figure(figsize=(15, 6))
+    ax1 = fig.add_subplot(1, 3, (1, 1), projection='3d')
+    ax1.set_box_aspect((global_params['width'], global_params['height'], abs(global_params['z_dim_hi'] - global_params['z_dim_hi'])))
+    ax2 = fig.add_subplot(1, 3, 3)
 
     ani = FuncAnimation(fig, update, frames=range(0, len(data_files), pick_every_timeframe), interval=1)
     FFwriter = animation.FFMpegWriter(fps=10)
     ani.save(os.path.join(os.getcwd(), 'data', 'animation.mp4'), writer=FFwriter)
-
-    print(f'Max used cells = {max_used_cells}')

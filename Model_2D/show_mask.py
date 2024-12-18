@@ -1,11 +1,13 @@
 # ******************************************************************************
 # @author: L. I. Nurtdinova
 # ******************************************************************************
+import copy
 import os
-
-from PIL import Image, ImageDraw
-import matplotlib.pyplot as plt
 import re
+import numpy as np
+
+import matplotlib.pyplot as plt
+from PIL import Image, ImageDraw
 
 multiplayer = 1000
 
@@ -41,6 +43,10 @@ def pars_in_file(f_name: str) -> dict[str, any]:
                 out_params['region_x_hi'] = params[4].strip()
                 out_params['region_y_lo'] = params[5].strip()
                 out_params['region_y_hi'] = params[6].strip()
+        elif params[0].strip() == 'read_surf':
+            if 'surfs' not in out_params:
+                out_params['surfs'] = []
+            out_params['surfs'].append(params[1].strip())
     return out_params
 
 
@@ -48,7 +54,7 @@ def pars_surf_file(f_name: str) -> (dict[int, dict[str, int]], dict[int, dict[st
     points = dict()
     lines = dict()
 
-    with open(f_name) as file:
+    with open(main_dir_path + '\\' + f_name) as file:
         f_lines = [line.rstrip() for line in file]
 
     count_points = int(f_lines[2].strip().split(' ')[0])
@@ -74,17 +80,24 @@ def pars_surf_file(f_name: str) -> (dict[int, dict[str, int]], dict[int, dict[st
     return points, lines, polygons
 
 
-def create_mask_template(in_file: str, data_file: str) -> (Image, int):
-    global_params = pars_in_file(in_file)
-    points, lines, polygons = pars_surf_file(data_file)
-
+def create_mask_template(in_file: str) -> (Image, int):
+    surfs = []
     max_x = 0
     max_y = 0
-    for key in points.keys():
-        if points[key]['x'] > max_x:
-            max_x = points[key]['x']
-        if points[key]['y'] > max_y:
-            max_y = points[key]['y']
+
+    global_params = pars_in_file(in_file)
+    for surf_file in global_params['surfs']:
+        points, lines, polygons = pars_surf_file(surf_file)
+        surfs.append({
+            'points': copy.deepcopy(points),
+            'lines': copy.deepcopy(lines),
+            'polygons': copy.deepcopy(polygons),
+        })
+        for key in points.keys():
+            if points[key]['x'] > max_x:
+                max_x = points[key]['x']
+            if points[key]['y'] > max_y:
+                max_y = points[key]['y']
 
     image = Image.new('RGBA', (max_x + 1, max_y + 1), (255, 255, 255, 255))
     draw = ImageDraw.Draw(image)
@@ -96,8 +109,9 @@ def create_mask_template(in_file: str, data_file: str) -> (Image, int):
         draw.line((point_from['x'], point_from['y'], point_to['x'], point_to['y']), fill=(0, 0, 0, 255))
     '''
 
-    for polygon in polygons:
-        draw.polygon(polygon, fill=(127, 127, 127, 255))
+    for surf in surfs:
+        for polygon in surf['polygons']:
+            draw.polygon(polygon, fill=(127, 127, 127, 255))
 
     if 'region_y_lo' in global_params:
         x_lo = float(global_params['region_x_lo']) * multiplayer
@@ -109,32 +123,51 @@ def create_mask_template(in_file: str, data_file: str) -> (Image, int):
         draw.line((x_lo, y_lo, x_lo, y_hi), fill=(255, 0, 0, 255))
         draw.line((x_hi, y_lo, x_hi, y_hi), fill=(255, 0, 0, 255))
 
+    for point in real_points:
+        x = int(point[0] * multiplayer)
+        y = int(point[1] * multiplayer)
+        draw.point((x, y), fill=(0, 255, 0, 255))
+
     return image, max_x
 
 
 def create_mask(template: Image, new_width: int, new_height: int, max_x: int) -> Image:
     background = Image.new('RGBA', (max(new_width, max_x + 50), new_height), (255, 255, 255, 255))
     background.paste(template)
-    back_crop = background.crop((0, round(new_height / 2) - 60, max_x, round(new_height / 2) + 60))
-    return back_crop
+    back_crop = background.crop((0, round(new_height / 2) - 1000, max_x, round(new_height / 2) + 1000))
+    #back_crop = background.crop((0, 0, max_x, 60))
+    return background
 
 
 def save_mask():
-    mask_tmpl, max_x = create_mask_template(main_dir_path + '\\in.step', main_dir_path + '\\data.step')
+    mask_tmpl, max_x = create_mask_template(main_dir_path + '\\in.step.temp')
     max_x += 50
-    mask_tmpl = create_mask(mask_tmpl, 2 * multiplayer, 4 * multiplayer, 120)
+    mask_tmpl = create_mask(mask_tmpl, 3 * multiplayer, 4 * multiplayer, max_x)
     fig, (ax1) = plt.subplots(1, 1, figsize=(15, 6))
 
-    plt.xlabel('мкм')
-    plt.ylabel('мкм')
-    # plt.xlim(0, 10)
-    # plt.ylim(0, height)
-    ax1.imshow(mask_tmpl)
+    plt.xlabel('мм')
+    plt.ylabel('мм')
+    x_ticks = np.arange(0, mask_tmpl.width + 1, 500)
+    x_labels = [f'{int(x / 100)}' for x in x_ticks]
+    ax1.set_xticks(x_ticks, labels=x_labels)
+    y_ticks = np.arange(0, mask_tmpl.height + 1, 500)
+    y_labels = [f'{int(y / 100)}' for y in y_ticks]
+    ax1.set_yticks(y_ticks, labels=y_labels)
+    ax1.imshow(mask_tmpl, extent=[0, mask_tmpl.width, 0, mask_tmpl.height])
 
     #mask_tmpl.save(os.getcwd() + '/data/mask_tmpl.png')
     plt.savefig(os.getcwd() + '/data/mask_tmpl.png')
 
 
 if __name__ == '__main__':
-    main_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\sparta_build\\textor'
+    main_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\sparta_git\\textor'
+
+    real_points = [
+        #[0.004177, 1.997785, 0.000000],
+        #[0.009604, 1.996509, 0.000000],
+        #[0.012529, 1.995110, 0.000000],
+        #[0.004183, 2.001787, 0.000000],
+        #[0.007708, 2.000062, 0.000000],
+    ]
+
     save_mask()
