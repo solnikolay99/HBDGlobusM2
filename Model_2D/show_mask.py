@@ -134,15 +134,15 @@ def create_mask_template(in_file: str) -> (Image, int):
 def create_mask(template: Image, new_width: int, new_height: int, max_x: int) -> Image:
     background = Image.new('RGBA', (max(new_width, max_x + 50), new_height), (255, 255, 255, 255))
     background.paste(template)
-    back_crop = background.crop((0, round(new_height / 2) - 1000, max_x, round(new_height / 2) + 1000))
+    back_crop = background.crop((0, round(new_height / 2) - 60, max_x, round(new_height / 2) + 60))
     #back_crop = background.crop((0, 0, max_x, 60))
-    return background
+    return back_crop
 
 
-def save_mask():
-    mask_tmpl, max_x = create_mask_template(main_dir_path + '\\in.step.temp')
+def save_mask(file_name: str):
+    mask_tmpl, max_x = create_mask_template(main_dir_path + '\\' + file_name)
     max_x += 50
-    mask_tmpl = create_mask(mask_tmpl, 3 * multiplayer, 4 * multiplayer, max_x)
+    mask_tmpl = create_mask(mask_tmpl, 3 * multiplayer, 4 * multiplayer, 120)
     fig, (ax1) = plt.subplots(1, 1, figsize=(15, 6))
 
     plt.xlabel('мм')
@@ -170,4 +170,5 @@ if __name__ == '__main__':
         #[0.007708, 2.000062, 0.000000],
     ]
 
-    save_mask()
+    save_mask('in.step')
+    #save_mask('in.step.temp')
