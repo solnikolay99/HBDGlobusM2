@@ -20,6 +20,7 @@ matplotlib.rcParams[
     'animation.ffmpeg_path'] = "C:\\Program Files\\ffmpeg-2024-09-26-git-f43916e217-essentials_build\\bin\\ffmpeg.exe"
 matplotlib.rcParams['legend.markerscale'] = 10
 multiplayer = 100
+last_surf_x = 0
 
 
 def start_timer():
@@ -27,7 +28,11 @@ def start_timer():
 
 
 def release_timer(timer_name: str, time_data: time):
-    print(f"Execution time for '{timer_name}' is {time.time() - time_data:.4f}")
+    time_delta = time.time() - time_data
+    time_seconds = time_delta % 60
+    time_minutes = time_delta / 60 % 60
+    time_hours = time_delta / 60 / 60 % 60
+    print(f"Execution time for '{timer_name}' is {time_hours:.0f}:{time_minutes:.0f}:{time_seconds:.4f}")
     pass
 
 
@@ -81,6 +86,8 @@ def pars_data(f_name: str) -> list[list[float]]:
 
 
 def pars_surf_file(f_name: str) -> (dict[int, dict[str, int]], dict[int, dict[str, int]]):
+    print(f"Pars surf file {f_name}")
+
     points = dict()
     lines = dict()
 
@@ -112,7 +119,7 @@ def pars_surf_file(f_name: str) -> (dict[int, dict[str, int]], dict[int, dict[st
 
 
 def create_mask_template(path_main_dir: str) -> Image:
-    global global_params
+    global global_params, last_surf_x
 
     if 'surfs' not in global_params:
         return Image.new('RGBA', (1, 1), (0, 100, 0, 255))
@@ -134,6 +141,7 @@ def create_mask_template(path_main_dir: str) -> Image:
             if points[key]['y'] > max_y:
                 max_y = points[key]['y']
 
+    last_surf_x = max_x
     image = Image.new('RGBA', (max_x + 1, max_y + 1), (0, 100, 0, 255))
     draw = ImageDraw.Draw(image)
 
@@ -173,7 +181,7 @@ def calculate_density(width: int,
     for point in timeframe:
         # if width - 1 >= point[0] >= width - 2:
         #    densities[int(point[1])] += 1
-        if point[0] > width - 10:
+        if point[0] > width - 100:
             point_ids[int(point[2])] = {'y': int(point[1]), 'seed': seed}
 
     keys = list(point_ids.keys())
@@ -348,13 +356,28 @@ def separate_points_by_density(timeframe: list[list[float]]) -> list[dict[str, l
             'points': [[], []]
         },
         {
-            'color': '#ffffff',
+            'color': '#8fbc8f',
             'legend': f'{8 * fnum:.0e} ≤ N < {10 * fnum:.0e}',
             'points': [[], []]
         },
         {
+            'color': '#808000',
+            'legend': f'{10 * fnum:.0e} ≤ N < {12 * fnum:.0e}',
+            'points': [[], []]
+        },
+        {
+            'color': '#9acd32',
+            'legend': f'{12 * fnum:.0e} ≤ N < {14 * fnum:.0e}',
+            'points': [[], []]
+        },
+        {
+            'color': '#ffffff',
+            'legend': f'{14 * fnum:.0e} ≤ N < {16 * fnum:.0e}',
+            'points': [[], []]
+        },
+        {
             'color': '#00ff00',
-            'legend': f'N ≥ {10 * fnum:.0e}',
+            'legend': f'N ≥ {16 * fnum:.0e}',
             'points': [[], []]
         },
     ]
@@ -398,11 +421,26 @@ def separate_points_by_density(timeframe: list[list[float]]) -> list[dict[str, l
                 out_graph[4]['points'][0].append(point)
             for point in grid[key][1]:
                 out_graph[4]['points'][1].append(point)
-        else:
+        elif 10 <= po < 12:
             for point in grid[key][0]:
                 out_graph[5]['points'][0].append(point)
             for point in grid[key][1]:
                 out_graph[5]['points'][1].append(point)
+        elif 12 <= po < 14:
+            for point in grid[key][0]:
+                out_graph[6]['points'][0].append(point)
+            for point in grid[key][1]:
+                out_graph[6]['points'][1].append(point)
+        elif 14 <= po < 16:
+            for point in grid[key][0]:
+                out_graph[7]['points'][0].append(point)
+            for point in grid[key][1]:
+                out_graph[7]['points'][1].append(point)
+        else:
+            for point in grid[key][0]:
+                out_graph[8]['points'][0].append(point)
+            for point in grid[key][1]:
+                out_graph[8]['points'][1].append(point)
 
     return out_graph
 
@@ -415,14 +453,19 @@ def update(frame):
 
         sum_count_points = sum(density_values)
         density_diameter, min_y, max_y = calculate_density_diameter(density_values, 1.0, density_smoothing)
-        angel = calculate_angel(width, height, min_y, max_y)
+        angel = calculate_angel(width - last_surf_x, height, min_y, max_y)
         density_diameter_90, min_y_90, max_y_90 = calculate_density_diameter(density_values, 0.9, density_smoothing)
-        angel_percentile = calculate_angel(width, height, min_y_90, max_y_90)
+        angel_percentile = calculate_angel(width - last_surf_x, height, min_y_90, max_y_90)
 
         timestep = float(global_params.get('timestep'))
 
         ax1.clear()
         ax1.set_title(f"{(timestep * 1e6 * frame): 6.2f} мкс")
+        ax1.set_xticks([0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000],
+                       labels=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150])
+        ax1.set_yticks([0, 500, 1000, 1500, 2000], labels=[0, 5, 10, 15, 20])
+        ax1.set_xlabel('см')
+        ax1.set_ylabel('см')
         # graphs = separate_points_by_kn(timeframe)
         graphs = separate_points_by_density(timeframe)
 
@@ -431,14 +474,14 @@ def update(frame):
                 ax1.scatter(graph['points'][0], graph['points'][1],
                             marker='.', s=0.5, color=graph['color'], label=graph['legend'])
 
-        ax1.legend(bbox_to_anchor=(0, -0.8, 1, -0.1), loc="lower left",
+        ax1.legend(bbox_to_anchor=(0, -1.2, 1, -0.1), loc="lower left",
                    mode="expand", borderaxespad=0, ncol=3, facecolor="darkgreen")
 
         fnum = float(global_params.get('fnum'))
 
         ax2.clear()
 
-        show_textor_graph(data_fig9a)
+        #show_textor_graph(data_fig9a)
 
         total_points = (len(uniq_points) * fnum)
         out_points = (sum_count_points * fnum)
@@ -455,6 +498,12 @@ def update(frame):
         # ax2.plot(density_values, density_labels)
         ax2.plot(labels, values, label='Modeling')
 
+        max_density_value = 0
+        if len(values) != 0:
+            max_density_value = max(values)
+        ax2.plot([min_y_90, min_y_90], [0, max_density_value])
+        ax2.plot([max_y_90, max_y_90], [0, max_density_value])
+
         ax2.legend()
 
         # plt.xlabel(f"y, {100 * density_smoothing} мкм")
@@ -467,8 +516,14 @@ def update(frame):
 
     ax1.imshow(mask, extent=[0, mask.width, 0, mask.height])
 
-    if frame == 20000:
-        plt.savefig(os.path.join(os.getcwd(), 'data', 'last_frame.png'))
+    if frame == 800:
+        plt.savefig(os.path.join(os.getcwd(), 'data', 'last_frame_1.png'))
+    if frame == 2000:
+        plt.savefig(os.path.join(os.getcwd(), 'data', 'last_frame_2.png'))
+    if frame == 2400:
+        plt.savefig(os.path.join(os.getcwd(), 'data', 'last_frame_3.png'))
+    if frame == 5000:
+        plt.savefig(os.path.join(os.getcwd(), 'data', 'last_frame_4.png'))
 
     print(f'{frame} frame')
 
@@ -482,7 +537,9 @@ if __name__ == '__main__':
     saving_to_file = 1
     density_smoothing = 8
 
-    global_params = pars_in_file(os.path.join(main_dir_path, 'in.step.temp'))
+    start_time = start_timer()
+
+    global_params = pars_in_file(os.path.join(main_dir_path, 'in.step'))
     width, height = global_params['width'], global_params['height']
     print(f'width = {width}, height = {height}')
 
@@ -496,12 +553,14 @@ if __name__ == '__main__':
     uniq_points, last_uniq_points = set(), set()
     max_used_cells = 0
 
-    #data_files = data_files[:501]
+    data_files = data_files[:7501]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6), width_ratios=[2, 1])
 
     ani = FuncAnimation(fig, update, frames=range(0, len(data_files), pick_every_timeframe), interval=1)
     FFwriter = animation.FFMpegWriter(fps=10)
     ani.save(os.path.join(os.getcwd(), 'data', 'animation.mp4'), writer=FFwriter)
+
+    release_timer('Animation time', start_time)
 
     print(f'Max used cells = {max_used_cells}')

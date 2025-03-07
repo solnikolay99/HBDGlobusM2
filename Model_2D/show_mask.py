@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
 
-multiplayer = 1000
+multiplayer = 4000
 
 
 def pars_in_file(f_name: str) -> dict[str, any]:
@@ -31,18 +31,24 @@ def pars_in_file(f_name: str) -> dict[str, any]:
         elif params[0].strip() == 'timestep':
             out_params['timestep'] = params[1].strip()
         elif params[0].strip() == 'region':
+            if 'regions' not in out_params:
+                out_params['regions'] = []
             if params[2].strip() == 'cylinder':
                 y = float(params[4].strip())
                 r = float(params[6].strip())
-                out_params['region_y_lo'] = f"{y - r}"
-                out_params['region_y_hi'] = f"{y + r}"
-                out_params['region_x_lo'] = params[7].strip()
-                out_params['region_x_hi'] = params[8].strip()
+                region_params = dict()
+                region_params['region_y_lo'] = f"{y - r}"
+                region_params['region_y_hi'] = f"{y + r}"
+                region_params['region_x_lo'] = params[7].strip()
+                region_params['region_x_hi'] = params[8].strip()
+                out_params['regions'].append(region_params)
             elif params[2].strip() == 'block':
-                out_params['region_x_lo'] = params[3].strip()
-                out_params['region_x_hi'] = params[4].strip()
-                out_params['region_y_lo'] = params[5].strip()
-                out_params['region_y_hi'] = params[6].strip()
+                region_params = dict()
+                region_params['region_x_lo'] = params[3].strip()
+                region_params['region_x_hi'] = params[4].strip()
+                region_params['region_y_lo'] = params[5].strip()
+                region_params['region_y_hi'] = params[6].strip()
+                out_params['regions'].append(region_params)
         elif params[0].strip() == 'read_surf':
             if 'surfs' not in out_params:
                 out_params['surfs'] = []
@@ -109,19 +115,36 @@ def create_mask_template(in_file: str) -> (Image, int):
         draw.line((point_from['x'], point_from['y'], point_to['x'], point_to['y']), fill=(0, 0, 0, 255))
     '''
 
+    colors = [30, 60, 90, 120, 150, 180, 210, 240]
+    flg = False
     for surf in surfs:
         for polygon in surf['polygons']:
             draw.polygon(polygon, fill=(127, 127, 127, 255))
+            '''
+            i = 0
+            flg = not flg
+            for xy in polygon:
+                if flg:
+                    draw.ellipse((xy[0]-50, xy[1]-50, xy[0]+50, xy[1]+50), fill=(0, colors[i], 0, 255))
+                else:
+                    draw.ellipse((xy[0] - 50, xy[1] - 50, xy[0] + 50, xy[1] + 50), fill=(0, 0, colors[i], 255))
+                i += 1
+            print(f'Polygon {polygon} has color {"green" if flg == True else "blue"}')
+            '''
 
-    if 'region_y_lo' in global_params:
-        x_lo = float(global_params['region_x_lo']) * multiplayer
-        x_hi = float(global_params['region_x_hi']) * multiplayer
-        y_lo = float(global_params['region_y_lo']) * multiplayer
-        y_hi = float(global_params['region_y_hi']) * multiplayer
-        draw.line((x_lo, y_lo, x_hi, y_lo), fill=(255, 0, 0, 255))
-        draw.line((x_lo, y_hi, x_hi, y_hi), fill=(255, 0, 0, 255))
-        draw.line((x_lo, y_lo, x_lo, y_hi), fill=(255, 0, 0, 255))
-        draw.line((x_hi, y_lo, x_hi, y_hi), fill=(255, 0, 0, 255))
+    if 'regions' in global_params:
+        for region in global_params['regions']:
+            x_lo = float(region['region_x_lo']) * multiplayer
+            x_hi = float(region['region_x_hi']) * multiplayer
+            y_lo = float(region['region_y_lo']) * multiplayer
+            y_hi = float(region['region_y_hi']) * multiplayer
+            polygon = [
+                (x_lo, y_lo),
+                (x_lo, y_hi),
+                (x_hi, y_hi),
+                (x_hi, y_lo),
+            ]
+            draw.polygon(polygon, fill=(215, 0, 0, 255))
 
     for point in real_points:
         x = int(point[0] * multiplayer)
@@ -134,19 +157,21 @@ def create_mask_template(in_file: str) -> (Image, int):
 def create_mask(template: Image, new_width: int, new_height: int, max_x: int) -> Image:
     background = Image.new('RGBA', (max(new_width, max_x + 50), new_height), (255, 255, 255, 255))
     background.paste(template)
-    back_crop = background.crop((0, round(new_height / 2) - 60, max_x, round(new_height / 2) + 60))
-    #back_crop = background.crop((0, 0, max_x, 60))
+    background = background.transpose(method=Image.FLIP_TOP_BOTTOM)
+    back_crop = background.crop((0, round(new_height / 2) - 250, max_x, round(new_height / 2) + 250))
+    #back_crop = background.crop((0, round(new_height / 2) - 5000, max_x, round(new_height / 2) + 5000))
+    #back_crop = background.crop((0, new_height - 4500, 2500, new_height - 0))
     return back_crop
 
 
 def save_mask(file_name: str):
     mask_tmpl, max_x = create_mask_template(main_dir_path + '\\' + file_name)
-    max_x += 50
-    mask_tmpl = create_mask(mask_tmpl, 3 * multiplayer, 4 * multiplayer, 120)
+    max_x += 10
+    mask_tmpl = create_mask(mask_tmpl, 27 * multiplayer, 4 * multiplayer, max_x)
     fig, (ax1) = plt.subplots(1, 1, figsize=(15, 6))
 
-    plt.xlabel('мм')
-    plt.ylabel('мм')
+    plt.xlabel('см')
+    plt.ylabel('см')
     x_ticks = np.arange(0, mask_tmpl.width + 1, 500)
     x_labels = [f'{int(x / 100)}' for x in x_ticks]
     ax1.set_xticks(x_ticks, labels=x_labels)
@@ -155,7 +180,7 @@ def save_mask(file_name: str):
     ax1.set_yticks(y_ticks, labels=y_labels)
     ax1.imshow(mask_tmpl, extent=[0, mask_tmpl.width, 0, mask_tmpl.height])
 
-    #mask_tmpl.save(os.getcwd() + '/data/mask_tmpl.png')
+    # mask_tmpl.save(os.getcwd() + '/data/mask_tmpl.png')
     plt.savefig(os.getcwd() + '/data/mask_tmpl.png')
 
 
@@ -163,12 +188,13 @@ if __name__ == '__main__':
     main_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\sparta_git\\textor'
 
     real_points = [
-        #[0.004177, 1.997785, 0.000000],
-        #[0.009604, 1.996509, 0.000000],
-        #[0.012529, 1.995110, 0.000000],
-        #[0.004183, 2.001787, 0.000000],
-        #[0.007708, 2.000062, 0.000000],
+        # [0.004177, 1.997785, 0.000000],
+        # [0.009604, 1.996509, 0.000000],
+        # [0.012529, 1.995110, 0.000000],
+        # [0.004183, 2.001787, 0.000000],
+        # [0.007708, 2.000062, 0.000000],
     ]
 
     save_mask('in.step')
-    #save_mask('in.step.temp')
+    # save_mask('in.step.temp')
+    #save_mask('in.step.big.PG')
