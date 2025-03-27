@@ -1,257 +1,60 @@
 # ******************************************************************************
 # @author: L. I. Nurtdinova
 # ******************************************************************************
-import copy
 import glob
-import math
-import os
-import re
-import time
-import traceback
-import uuid
+import sys
 
-import matplotlib
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw
 from matplotlib.animation import FuncAnimation
+
+from animation.graphs import *
+from animation.mask import *
 
 matplotlib.rcParams[
     'animation.ffmpeg_path'] = "C:\\Program Files\\ffmpeg-2024-09-26-git-f43916e217-essentials_build\\bin\\ffmpeg.exe"
 matplotlib.rcParams['legend.markerscale'] = 10
-multiplayer = 100
-last_surf_x = 0
-
-
-def start_timer():
-    return time.time()
-
-
-def release_timer(timer_name: str, time_data: time):
-    time_delta = time.time() - time_data
-    time_seconds = time_delta % 60
-    time_minutes = time_delta / 60 % 60
-    time_hours = time_delta / 60 / 60 % 60
-    print(f"Execution time for '{timer_name}' is {time_hours:.0f}:{time_minutes:.0f}:{time_seconds:.4f}")
-    pass
 
 
 def name_reader(dir_path, pattern):
     return sorted(glob.glob(os.path.join(dir_path, pattern)))
 
 
-def pars_in_file(f_name: str) -> dict[str, any]:
-    out_params = dict()
-    with open(f_name) as file:
-        lines = [line.rstrip() for line in file]
-    for line in lines:
-        line = line.strip()
-        line = re.sub('[\t]', '', line)
-        line = re.sub(' +', ' ', line)
-        params = line.strip().split(' ')
-        if len(params) <= 0:
-            continue
-        if params[0].startswith('#'):
-            continue
-        if params[0].strip() == 'global':
-            for i in range(1, len(params), 2):
-                out_params[params[i].strip()] = params[i + 1].strip()
-        elif params[0].strip() == 'timestep':
-            out_params['timestep'] = params[1].strip()
-        elif params[0].strip() == 'create_box':
-            out_params['width'] = int(float(params[2].strip()) - float(params[1].strip())) * multiplayer
-            out_params['height'] = int(float(params[4].strip()) - float(params[3].strip())) * multiplayer
-        elif params[0].strip() == 'read_surf':
-            if 'surfs' not in out_params:
-                out_params['surfs'] = []
-            out_params['surfs'].append(params[1].strip())
-    return out_params
-
-
-def pars_data(f_name: str) -> list[list[float]]:
-    with open(f_name) as file:
-        lines = [line.rstrip() for line in file]
-    header = lines[8]
-    lines = lines[9:]
-
-    headers = header.replace('ITEM: ATOMS ', '').strip().split(' ')
-    points = []
-    for line in lines:
-        params = line.strip().split(' ')
-        points.append([float(params[headers.index('x')]) * multiplayer,
-                       float(params[headers.index('y')]) * multiplayer,
-                       int(params[headers.index('id')])])
-
-    return points
-
-
-def pars_surf_file(f_name: str) -> (dict[int, dict[str, int]], dict[int, dict[str, int]]):
-    print(f"Pars surf file {f_name}")
-
-    points = dict()
-    lines = dict()
-
-    with open(f_name) as file:
-        f_lines = [line.rstrip() for line in file]
-
-    count_points = int(f_lines[2].strip().split(' ')[0])
-    count_lines = int(f_lines[3].strip().split(' ')[0])
-
-    polygons = []
-    add_new_polygon = True
-
-    for i in range(7, 7 + count_points):
-        point = f_lines[i].strip().split(' ')
-        points[int(point[0])] = {'x': int(float(point[1]) * multiplayer), 'y': int(float(point[2]) * multiplayer)}
-    for i in range(10 + count_points, 10 + count_points + count_lines):
-        line = f_lines[i].strip().split(' ')
-        lines[int(line[0])] = {'from': int(line[1]), 'to': int(line[2])}
-        if add_new_polygon:
-            polygons.append([(points[int(line[1])]['x'], points[int(line[1])]['y'])])
-        else:
-            polygons[len(polygons) - 1].append((points[int(line[1])]['x'], points[int(line[1])]['y']))
-        if int(line[0]) > int(line[2]):
-            add_new_polygon = True
-        else:
-            add_new_polygon = False
-
-    return points, lines, polygons
-
-
-def create_mask_template(path_main_dir: str) -> Image:
-    global global_params, last_surf_x
-
-    if 'surfs' not in global_params:
-        return Image.new('RGBA', (1, 1), (0, 100, 0, 255))
-
-    surfs = []
-    max_x = 0
-    max_y = 0
-
-    for surf_file in global_params['surfs']:
-        points, lines, polygons = pars_surf_file(os.path.join(path_main_dir, surf_file))
-        surfs.append({
-            'points': copy.deepcopy(points),
-            'lines': copy.deepcopy(lines),
-            'polygons': copy.deepcopy(polygons),
-        })
-        for key in points.keys():
-            if points[key]['x'] > max_x:
-                max_x = points[key]['x']
-            if points[key]['y'] > max_y:
-                max_y = points[key]['y']
-
-    last_surf_x = max_x
-    image = Image.new('RGBA', (max_x + 1, max_y + 1), (0, 100, 0, 255))
-    draw = ImageDraw.Draw(image)
-
-    '''
-    for key in lines.keys():
-        point_from = points[lines[key]['from']]
-        point_to = points[lines[key]['to']]
-        draw.line((point_from['x'], point_from['y'], point_to['x'], point_to['y']), fill=(0, 0, 0, 255))
-    '''
-
-    for surf in surfs:
-        for polygon in surf['polygons']:
-            draw.polygon(polygon, fill=(127, 127, 127, 255))
-
-    return image
-
-
-def create_mask(template: Image, new_width: int, new_height: int) -> Image:
-    background = Image.new('RGBA', (new_width, new_height), (0, 100, 0, 255))
-    background.paste(template)
-    return background
-
-
-def calculate_density(width: int,
-                      height: int,
-                      timeframe: list[list[float]],
-                      labels: list[float],
-                      densities: list[int],
-                      point_ids: dict[int, dict[str, int]],
-                      smoothing: int) -> (list[float], list[int], dict[int, dict[str, int]]):
-    if len(labels) < 1:
-        labels = [i for i in range(int(height / smoothing) + 1)]
-    if len(densities) < 1:
-        densities = [0 for _ in range(int(height / smoothing) + 1)]
-
-    seed = uuid.uuid4()
-    for point in timeframe:
-        # if width - 1 >= point[0] >= width - 2:
-        #    densities[int(point[1])] += 1
-        if point[0] > width - 100:
-            point_ids[int(point[2])] = {'y': int(point[1]), 'seed': seed}
-
-    keys = list(point_ids.keys())
-    for key in keys:
-        if point_ids[key]['seed'] != seed:
-            densities[int(point_ids[key]['y'] / smoothing)] += 1
-            del point_ids[key]
-
-    return labels, densities, point_ids
-
-
-def calculate_density_diameter(densities: list[int], percentile: float, reducer: int) -> (float, float, float):
-    min_y = len(densities)
-    max_y = 0
-
-    if len(densities) == 0:
-        return 0.0, 0.0, 0.0
-
-    min_value = max(densities) * (1 - percentile)
-    for i in range(len(densities)):
-        if densities[i] > min_value:
-            if i < min_y:
-                min_y = i
-            if i > max_y:
-                max_y = i
-    if min_y < max_y:
-        return (max_y - min_y) * reducer, min_y * reducer, max_y * reducer
-    else:
-        return 0.0, 0.0, 0.0
-
-
-def calculate_angel(length: float, width: float, min_y: float, max_y: float) -> float:
-    if min_y == 0.0 and max_y == 0.0:
-        return 0.0
-    max_r = max(abs(width * 0.5 - min_y), abs(width * 0.5 - max_y))
-    return math.degrees(math.atan(max_r / length))
-
-
-def get_frame_data(frame: int, count_frames: int):
-    global density_labels, density_values, density_point_ids, uniq_points, last_uniq_points
+def get_frame_data(frame: int):
+    start_gfd = adl.start_timer()
 
     if frame == 0:
         return [], [], []
 
-    i = 0
-    timeframe = []
-    for i in range(frame - count_frames, frame):
-        timeframe = pars_data(data_files[i])
-        density_labels, density_values, density_point_ids = \
-            calculate_density(width, height, timeframe, density_labels, density_values, density_point_ids,
-                              density_smoothing)
+    if len(gp.density_labels) < 1:
+        gp.density_labels = [i for i in range(int(height / gp.density_smoothing) + 1)]
+    if len(gp.density_values) < 1:
+        gp.density_values = [0 for _ in range(int(height / gp.density_smoothing) + 1)]
 
-        last_uniq_points = set()
-        for point in timeframe:
-            if int(point[2]) not in uniq_points:
-                last_uniq_points.add(int(point[2]))
-            uniq_points.add(int(point[2]))
+    timeframe = pars_data2(data_files[frame])
+    frame_name = re.sub(r"(.+\.)([0-9]+)(\.txt)", r"\2", data_files[frame])
+    density_file_name = ''
+    for density_file in density_files:
+        if f'{frame_name}' in density_file:
+            density_file_name = density_file
+            break
+    gp.density_values = pars_density(density_file_name, gp.density_values)
 
-    print(f"Stored data from file '{data_files[i]}'")
+    grid_params_file_name = ''
+    for grid_file in grid_files:
+        if f'.{frame_name}' in grid_file:
+            grid_params_file_name = grid_file
+            break
+    gp.grid_params = pars_grid_params(grid_params_file_name)
 
-    return timeframe, density_labels, density_values
+    for point in timeframe:
+        gp.uniq_points.add(int(point[2]))
 
+    adl.release_timer('Get frame data', start_gfd)
 
-def show_textor_graph(data: list[list[float]]):
-    values, labels = [], []
-    for point in data:
-        values.append(point[0])
-        labels.append(point[1])
-    ax2.clear()
-    ax2.plot(values, labels, color='green', label='Textor')
+    print(f"Stored data from file '{data_files[frame]}'")
+
+    return timeframe
 
 
 def get_only_nonzero_labels(in_values: list[int], in_labels: list[float]) -> (list[int], list[float]):
@@ -263,304 +66,66 @@ def get_only_nonzero_labels(in_values: list[int], in_labels: list[float]) -> (li
     return out_values, out_labels
 
 
-def shift_labels_by_smoothing(in_values: list[int], in_labels: list[float], smoothing: int) -> (list[int], list[float]):
-    out_values, out_labels = [], []
-    for i in range(len(in_labels)):
-        out_values.append(in_values[i])
-        out_labels.append(in_labels[i] * smoothing)
-    return out_values, out_labels
-
-
-def calculate_kn(cell_points: list[list[float]]) -> float:
-    fnum = float(global_params.get('fnum'))
-    sigma = 2.33e-8
-    L = 5e-3
-    n = (len(cell_points) * fnum) / (L * L * 1)
-    Kn = 1 / (math.sqrt(2) * sigma * sigma * n) / L
-    return Kn
-
-
-def separate_points_by_kn(timeframe: list[list[float]]) -> list[dict[str, list[list[float]]]]:
-    out_graph = [
-        {
-            'color': '#0000ff',
-            'legend': 'Kn < 0.001',
-            'points': [[], []]
-        },
-        {
-            'color': '#ff531f',
-            'legend': '0.001 < Kn < 1',
-            'points': [[], []]
-        },
-        {
-            'color': '#ffffff',
-            'legend': '1 <= Kn',
-            'points': [[], []]
-        },
-    ]
-
-    grid = dict()
-    for point in timeframe:
-        key = f'{int(point[0] / 50)}_{int(point[1] / 50)}'
-        if key not in grid:
-            grid[key] = [[], []]
-        grid[key][0].append(point[0])
-        grid[key][1].append(point[1])
-
-    for key in grid.keys():
-        kn = calculate_kn(grid[key])
-        if kn < 1e-3:
-            for point in grid[key][0]:
-                out_graph[0]['points'][0].append(point)
-            for point in grid[key][1]:
-                out_graph[0]['points'][1].append(point)
-        elif kn >= 1:
-            for point in grid[key][0]:
-                out_graph[2]['points'][0].append(point)
-            for point in grid[key][1]:
-                out_graph[2]['points'][1].append(point)
-        else:
-            for point in grid[key][0]:
-                out_graph[1]['points'][0].append(point)
-            for point in grid[key][1]:
-                out_graph[1]['points'][1].append(point)
-
-    return out_graph
-
-
-def separate_points_by_density(timeframe: list[list[float]]) -> list[dict[str, list[list[float]]]]:
-    global max_used_cells
-
-    fnum = float(global_params.get('fnum'))
-    # fnum = 1e0
-
-    out_graph = [
-        {
-            'color': '#ff531f',
-            'legend': f'N <  {2 * fnum:.0e}',
-            'points': [[], []]
-        },
-        {
-            'color': '#00A2E8',
-            'legend': f'{2 * fnum:.0e} ≤ N < {4 * fnum:.0e}',
-            'points': [[], []]
-        },
-        {
-            'color': '#0000ff',
-            'legend': f'{4 * fnum:.0e} ≤ N < {6 * fnum:.0e}',
-            'points': [[], []]
-        },
-        {
-            'color': '#000000',
-            'legend': f'{6 * fnum:.0e} ≤ N < {8 * fnum:.0e}',
-            'points': [[], []]
-        },
-        {
-            'color': '#8fbc8f',
-            'legend': f'{8 * fnum:.0e} ≤ N < {10 * fnum:.0e}',
-            'points': [[], []]
-        },
-        {
-            'color': '#808000',
-            'legend': f'{10 * fnum:.0e} ≤ N < {12 * fnum:.0e}',
-            'points': [[], []]
-        },
-        {
-            'color': '#9acd32',
-            'legend': f'{12 * fnum:.0e} ≤ N < {14 * fnum:.0e}',
-            'points': [[], []]
-        },
-        {
-            'color': '#ffffff',
-            'legend': f'{14 * fnum:.0e} ≤ N < {16 * fnum:.0e}',
-            'points': [[], []]
-        },
-        {
-            'color': '#00ff00',
-            'legend': f'N ≥ {16 * fnum:.0e}',
-            'points': [[], []]
-        },
-    ]
-
-    grid = dict()
-    for point in timeframe:
-        key = f'{int(point[0] / (0.05 * multiplayer))}_{int(point[1] / (0.05 * multiplayer))}'
-        if key not in grid:
-            grid[key] = [[], []]
-        grid[key][0].append(point[0])
-        grid[key][1].append(point[1])
-
-    if len(grid.keys()) > max_used_cells:
-        max_used_cells = len(grid.keys())
-
-    for key in grid.keys():
-        po = len(grid[key][0])
-
-        if po < 2:
-            for point in grid[key][0]:
-                out_graph[0]['points'][0].append(point)
-            for point in grid[key][1]:
-                out_graph[0]['points'][1].append(point)
-        elif 2 <= po < 4:
-            for point in grid[key][0]:
-                out_graph[1]['points'][0].append(point)
-            for point in grid[key][1]:
-                out_graph[1]['points'][1].append(point)
-        elif 4 <= po < 6:
-            for point in grid[key][0]:
-                out_graph[2]['points'][0].append(point)
-            for point in grid[key][1]:
-                out_graph[2]['points'][1].append(point)
-        elif 6 <= po < 8:
-            for point in grid[key][0]:
-                out_graph[3]['points'][0].append(point)
-            for point in grid[key][1]:
-                out_graph[3]['points'][1].append(point)
-        elif 8 <= po < 10:
-            for point in grid[key][0]:
-                out_graph[4]['points'][0].append(point)
-            for point in grid[key][1]:
-                out_graph[4]['points'][1].append(point)
-        elif 10 <= po < 12:
-            for point in grid[key][0]:
-                out_graph[5]['points'][0].append(point)
-            for point in grid[key][1]:
-                out_graph[5]['points'][1].append(point)
-        elif 12 <= po < 14:
-            for point in grid[key][0]:
-                out_graph[6]['points'][0].append(point)
-            for point in grid[key][1]:
-                out_graph[6]['points'][1].append(point)
-        elif 14 <= po < 16:
-            for point in grid[key][0]:
-                out_graph[7]['points'][0].append(point)
-            for point in grid[key][1]:
-                out_graph[7]['points'][1].append(point)
-        else:
-            for point in grid[key][0]:
-                out_graph[8]['points'][0].append(point)
-            for point in grid[key][1]:
-                out_graph[8]['points'][1].append(point)
-
-    return out_graph
-
-
 def update(frame):
-    global mask, density_labels, density_values, density_point_ids, uniq_points, last_uniq_points, data_fig9a
+    start_update = adl.start_timer()
 
     try:
-        timeframe, density_labels, density_values = get_frame_data(frame, pick_every_timeframe)
-
-        sum_count_points = sum(density_values)
-        density_diameter, min_y, max_y = calculate_density_diameter(density_values, 1.0, density_smoothing)
-        angel = calculate_angel(width - last_surf_x, height, min_y, max_y)
-        density_diameter_90, min_y_90, max_y_90 = calculate_density_diameter(density_values, 0.9, density_smoothing)
-        angel_percentile = calculate_angel(width - last_surf_x, height, min_y_90, max_y_90)
-
-        timestep = float(global_params.get('timestep'))
-
-        ax1.clear()
-        ax1.set_title(f"{(timestep * 1e6 * frame): 6.2f} мкс")
-        ax1.set_xticks([0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000],
-                       labels=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150])
-        ax1.set_yticks([0, 500, 1000, 1500, 2000], labels=[0, 5, 10, 15, 20])
-        ax1.set_xlabel('см')
-        ax1.set_ylabel('см')
-        # graphs = separate_points_by_kn(timeframe)
-        graphs = separate_points_by_density(timeframe)
-
-        for graph in graphs:
-            if len(graph['points']) > 0:
-                ax1.scatter(graph['points'][0], graph['points'][1],
-                            marker='.', s=0.5, color=graph['color'], label=graph['legend'])
-
-        ax1.legend(bbox_to_anchor=(0, -1.2, 1, -0.1), loc="lower left",
-                   mode="expand", borderaxespad=0, ncol=3, facecolor="darkgreen")
-
-        fnum = float(global_params.get('fnum'))
-
-        ax2.clear()
-
-        #show_textor_graph(data_fig9a)
-
-        total_points = (len(uniq_points) * fnum)
-        out_points = (sum_count_points * fnum)
-        if len(uniq_points) == 0:
-            out_percent = 0
-        else:
-            out_percent = (out_points / total_points) * 100
-
-        values, labels = shift_labels_by_smoothing(density_values, density_labels, density_smoothing)
-
-        ax2.set_title(f"Общее число частиц: {total_points:.2e} ({len(uniq_points)} модельных)\n"
-                      f"Плотность на выходе: {out_points:.2e} ({sum_count_points} модельных) {out_percent:.2f}%\n"
-                      f"Диаметр потока: {density_diameter * 0.1:.1f} ({density_diameter_90 * 0.1:.1f}) мм / {angel:.3f} ({angel_percentile:.3f}) градусов")
-        # ax2.plot(density_values, density_labels)
-        ax2.plot(labels, values, label='Modeling')
-
-        max_density_value = 0
-        if len(values) != 0:
-            max_density_value = max(values)
-        ax2.plot([min_y_90, min_y_90], [0, max_density_value])
-        ax2.plot([max_y_90, max_y_90], [0, max_density_value])
-
-        ax2.legend()
-
-        # plt.xlabel(f"y, {100 * density_smoothing} мкм")
-        plt.xlabel(f"y, 100 мкм")
-        plt.ylabel('x, ед.')
-        # plt.xlim(0, int(height / density_smoothing))
-        plt.xlim(0, height)
+        timeframe = get_frame_data(frame)
+        show_density_graph(ax11, frame, timeframe, mask)
+        show_temperature_graph(ax21, frame, timeframe, mask)
+        show_target_graph(ax12)
+        show_nozzle_graph(ax22, frame, timeframe, small_mask)
     except Exception:
         print(traceback.format_exc())
 
-    ax1.imshow(mask, extent=[0, mask.width, 0, mask.height])
+    frames = [1000, 2000, 5000, 20000, 24000]
+    for i in range(len(frames)):
+        if frames[i] == frame:
+            plt.savefig(os.path.join(os.getcwd(), 'data', f'last_frame_{i + 1}.png'))
 
-    if frame == 800:
-        plt.savefig(os.path.join(os.getcwd(), 'data', 'last_frame_1.png'))
-    if frame == 2000:
-        plt.savefig(os.path.join(os.getcwd(), 'data', 'last_frame_2.png'))
-    if frame == 2400:
-        plt.savefig(os.path.join(os.getcwd(), 'data', 'last_frame_3.png'))
-    if frame == 5000:
-        plt.savefig(os.path.join(os.getcwd(), 'data', 'last_frame_4.png'))
-
+    # adl.release_timer("Update iteration", start_update)
     print(f'{frame} frame')
 
 
 if __name__ == '__main__':
-    main_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\sparta_git\\textor'
-    #parts_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\cache\\'
-    parts_dir_path = 'D:\\dumps\\'
-
     pick_every_timeframe = 100
-    saving_to_file = 1
-    density_smoothing = 8
 
-    start_time = start_timer()
+    start_time = adl.start_timer()
 
-    global_params = pars_in_file(os.path.join(main_dir_path, 'in.step'))
-    width, height = global_params['width'], global_params['height']
+    gp.global_params = pars_in_file(os.path.join(gp.main_dir_path, 'in.step' if len(sys.argv) < 2 else sys.argv[1]))
+    width, height = gp.global_params['width'], gp.global_params['height']
     print(f'width = {width}, height = {height}')
 
-    mask_template = create_mask_template(main_dir_path)
-    mask = create_mask(mask_template, width, height)
+    mask = create_mask(width, height)
+    small_mask = create_small_mask(width, height)
 
-    data_fig9a = pars_data(os.path.join(main_dir_path, 'dump.fig_9a.txt'))
+    # data_fig9a = pars_data(os.path.join(main_dir_path, 'dump.fig_9a.txt'))
 
-    data_files = name_reader(parts_dir_path, 'dump.*.txt')
-    density_labels, density_values, density_point_ids = [], [], dict()
-    uniq_points, last_uniq_points = set(), set()
-    max_used_cells = 0
+    data_files = name_reader(gp.parts_dir_path, 'dump.*.txt')
+    density_files = name_reader(gp.parts_dir_path, 'density.*.txt')
+    grid_files = name_reader(gp.parts_dir_path, 'grid.*.txt')
 
-    data_files = data_files[:7501]
+    data_files = data_files[:1001]
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6), width_ratios=[2, 1])
+    px = 1 / plt.rcParams['figure.dpi']
+    fig = plt.figure(layout="constrained", figsize=(1900 * px, 1000 * px))
+    axd = fig.subplot_mosaic(
+        """
+        AC
+        BD
+        """,
+        # height_ratios=[1, 2],
+        width_ratios=[2, 1],
+    )
+    ax11 = axd['A']
+    ax21 = axd['B']
+    ax12 = axd['C']
+    ax22 = axd['D']
 
     ani = FuncAnimation(fig, update, frames=range(0, len(data_files), pick_every_timeframe), interval=1)
     FFwriter = animation.FFMpegWriter(fps=10)
     ani.save(os.path.join(os.getcwd(), 'data', 'animation.mp4'), writer=FFwriter)
 
-    release_timer('Animation time', start_time)
+    adl.release_timer('Animation time', start_time)
 
-    print(f'Max used cells = {max_used_cells}')
+    print(f'Max used cells = {gp.max_used_cells}')
