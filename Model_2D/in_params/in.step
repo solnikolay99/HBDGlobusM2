@@ -1,0 +1,92 @@
+################################################################################
+# 2d flow around a staircase of steps
+#
+# Note:
+#  - The "comm/sort” option to the “global” command is used to match MPI runs.
+#  - The “twopass” option is used to match Kokkos runs.
+# The "comm/sort" and "twopass" options should not be used for production runs.
+################################################################################
+
+seed	    	    35779
+dimension   	    2
+global              gridcut 0.0 comm/sort yes
+units               cgs
+
+boundary	    ro o p
+
+create_box  	    0 22 0 4 -0.0025 0.0025
+create_grid 	    4400 800 1
+
+#region              nozzlegrid block 0 3.400 1.930 2.070 -0.025 0.025
+#create_grid 	    4400 800 1 levels 2 region 2 nozzlegrid 10 10 1
+
+balance_grid        rcb cell
+#balance_grid        rcb part
+#adapt_grid          all refine coarsen particle 5 10 iterate 10 maxlevel 3 minlevel 3
+#fix                 1 balance 50 1.0 rcb cell
+
+#global		    nrho 1.224e15 fnum 1e16
+global		    fnum 2e9
+
+species		    air.species He
+#mixture		    air He vstream 1760.0 0.0 0.0 
+#mixture		    air He nrho 2.6e17 vstream 100000.0 0.0 0.0
+mixture		    air He nrho 1.01e16 temp 300
+#mixture		    air He nrho 4.47e15 temp 600
+#mixture		    air He nrho 3.67e15 temp 900
+
+#read_surf	    nozzle.real.d0.5mm.step
+#read_surf	    nozzle.Lavale.p_1.8.step
+read_surf	    nozzle.Lavale.p_0.01.step
+surf_collide	    1 specular
+surf_modify         all collide 1
+
+read_surf	    skimmer.real.4.step
+#read_surf	    skimmer.real.d0.5mm.step
+surf_collide	    2 specular
+surf_modify         all collide 2
+
+collide             vss air air.vss
+
+#region              nozzle cylinder x 2.0 0 0.005 0 0.095
+#region              nozzle block 0 1 1.5 2.5 -0.025 0.025
+#region              nozzle block 0 0.005 1.975 2.025 -0.025 0.025
+region              nozzle block 0 0.005 1.983 2.017 -0.025 0.025
+
+#fix		    in emit/face air xlo region nozzle twopass
+fix		    in emit/face air xlo region nozzle
+
+timestep 	    5e-8
+
+#dump                2 image all 2 images/image.*.png type type pdiam 1 &
+#                    surf proc 0.01 size 960 240 zoom 6
+#dump_modify	    2 pad 6 pcolor * red/red/red/red/red/red backcolor darkorange
+#dump                3 particle all 1 dumps/dump.*.txt id type x y xs ys vx vy
+
+#compute		    pTemp ke/particle
+#dump                3 particle all 1 /mnt/d/dumps/dump.*.txt id type x y c_pTemp[*] cellID
+dump                3 particle all 100 /mnt/d/dumps/dump.*.txt id x y cellID
+dump_modify	    3 pad 6
+
+compute		    gTemp thermal/grid all species press temp
+dump		    4 grid all 100 /mnt/d/dumps/grid.*.txt id c_gTemp[1] c_gTemp[2]
+dump_modify	    4 pad 6
+#dump_modify	    4 thresh c_gTemp[1] > 0.0 thresh c_gTemp[2] > 0.0
+
+region              target block 21.95 22 0 4 -0.025 0.025
+dump                5 particle all 1 /mnt/d/dumps/target.*.txt id x y
+dump_modify	    5 pad 6 region target
+
+dump		    6 grid all 100000 /mnt/d/dumps/cells.txt id split xlo ylo xhi yhi
+
+region              influx block 0 0.005 0 4 -0.025 0.025
+dump                7 particle all 1 /mnt/d/dumps/influx.*.txt id vx vy
+dump_modify	    7 pad 6 region influx
+
+stats		    100
+stats_style	    step cpu wall time np nattempt ncoll nscoll nscheck
+run 		    20000
+
+fix		    in emit/face air xlo region nozzle subsonic 0.0 300 twopass
+
+run 		    26000 upto

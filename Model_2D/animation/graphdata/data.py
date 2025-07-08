@@ -58,14 +58,30 @@ def separate_points_by_density(timeframe: list[list[float]]) -> list[dict[str, l
         'points': [[], []]
     } for key in cmap]
 
+    count_set = 0
+    count_errors = 0
+    uniq_cells = set()
     for point in timeframe:
         if len(point) == 0:
             continue
 
-        cell_param = gp.grid_params[int(point[3])]
-        po = int(cell_param[0] / 2) if int(cell_param[0] / 2) < len(out_graph) else len(out_graph) - 1
+        if int(point[3]) in uniq_cells:
+            continue
+        else:
+            uniq_cells.add(int(point[3]))
+
+        try:
+            cell_param = gp.grid_params[int(point[3])]
+            po = int(cell_param[0] / 2) if int(cell_param[0] / 2) < len(out_graph) else len(out_graph) - 1
+            count_set += 1
+        except:
+            po = 0
+            count_errors += 1
         out_graph[po]['points'][0].append(point[0])
         out_graph[po]['points'][1].append(point[1])
+
+    if count_errors > 0:
+        print(f'Count points with (without) density: {count_set} ({count_errors})')
 
     return out_graph
 
@@ -89,18 +105,42 @@ def separate_points_by_temp(timeframe: list[list[float]]) -> list[dict[str, list
         'points': [[], []]
     } for key in cmap]
 
+    uniq_cells = set()
     separators = [0, 50, 100, 150, 200, 250, 300, 400, 500, 1e6]
     for point in timeframe:
         if len(point) == 0:
             continue
-        cell_param = gp.grid_params[int(point[3])]
-        for i in range(len(separators) - 1):
-            if separators[i] <= cell_param[1] < separators[i + 1]:
-                out_graph[i]['points'][0].append(point[0])
-                out_graph[i]['points'][1].append(point[1])
-                break
+
+        if int(point[3]) in uniq_cells:
+            continue
+        else:
+            uniq_cells.add(int(point[3]))
+
+        try:
+            cell_param = gp.grid_params[int(point[3])]
+            for i in range(len(separators) - 1):
+                if separators[i] <= cell_param[1] < separators[i + 1]:
+                    out_graph[i]['points'][0].append(point[0])
+                    out_graph[i]['points'][1].append(point[1])
+                    break
+        except:
+            out_graph[0]['points'][0].append(point[0])
+            out_graph[0]['points'][1].append(point[1])
 
     return out_graph
+
+
+def adjust_points_by_temp(timeframe: list[list[float]]) -> list[list[float]]:
+    for point in timeframe:
+        if len(point) == 0:
+            continue
+        try:
+            cell_param = gp.grid_params[int(point[3])]
+            point.append(cell_param[1])
+        except:
+            point.append(0)
+
+    return timeframe
 
 
 def exclude_points(timeframe: list[list[float]],

@@ -1,7 +1,9 @@
-main_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\sparta_git\\textor'
-# parts_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\cache\\'
+#main_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\sparta_git\\textor'
+main_dir_path = 'D:\\dumps\\'
+#parts_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\cache\\'
 parts_dir_path = 'D:\\dumps\\'
 
+unit_system_CGS = True
 multiplayer = 100
 kB1 = 1 / 1.38067e-16
 global_params = dict[str, any]

@@ -20,11 +20,16 @@ def pars_in_file(f_name: str) -> dict[str, any]:
         if params[0].strip() == 'global':
             for i in range(1, len(params), 2):
                 out_params[params[i].strip()] = params[i + 1].strip()
+        elif params[0].strip() == 'units':
+            gp.unit_system_CGS = (params[1].strip() == 'cgs')
+            if not gp.unit_system_CGS:
+                gp.multiplayer *= 100
+                gp.density_smoothing *= 10
         elif params[0].strip() == 'timestep':
             out_params['timestep'] = params[1].strip()
         elif params[0].strip() == 'create_box':
-            out_params['width'] = int(float(params[2].strip()) - float(params[1].strip())) * gp.multiplayer
-            out_params['height'] = int(float(params[4].strip()) - float(params[3].strip())) * gp.multiplayer
+            out_params['width'] = int((float(params[2].strip()) - float(params[1].strip())) * gp.multiplayer)
+            out_params['height'] = int((float(params[4].strip()) - float(params[3].strip())) * gp.multiplayer)
         elif params[0].strip() == 'create_grid':
             out_params['width_cells'] = int(params[1].strip())
             out_params['height_cells'] = int(params[2].strip())
@@ -70,7 +75,7 @@ def pars_data2(f_name: str) -> list[list[float]]:
     start_read_file = adl.start_timer()
     with open(f_name) as file:
         lines = [line for line in file]
-    # adl.release_timer("Read data from file", start_read_file)
+    adl.release_timer("Read data from file", start_read_file)
 
     header = lines[8]
     lines = lines[9:]
@@ -89,7 +94,7 @@ def pars_data2(f_name: str) -> list[list[float]]:
                        float(params[header_y_index]) * gp.multiplayer,
                        int(params[header_id_index]),
                        int(params[header_cell_id_index])])
-    # adl.release_timer("Pars file data", start_pars_data)
+    adl.release_timer("Pars file data", start_pars_data)
 
     return points
 
@@ -184,17 +189,32 @@ def pars_grid_params(f_name: str) -> dict[int, list[float]]:
 
     headers = header.replace('ITEM: CELLS ', '').strip().split(' ')
     header_id_index = headers.index('id')
-    header_n_index = headers.index('c_gTemp[1]')
-    header_temp_index = headers.index('c_gTemp[2]')
+    #header_p_index = headers.index('c_gTemp[1]')
+    #header_t_index = headers.index('c_gTemp[2]')
+    header_p_index = headers.index('f_aveGridTemp[1]')
+    header_t_index = headers.index('f_aveGridTemp[2]')
 
     for line in lines:
         if line.endswith(f'0 0 \n'):
             continue
         params = line.split(' ')
-        n = int(params[header_n_index])
-        temp = float(params[header_temp_index])
-        if n > 0 and temp > 0:
+        p = float(params[header_p_index])
+        temp = float(params[header_t_index])
+        if p > 0 and temp > 0:
             cell_id = int(params[header_id_index])
-            grid_params[cell_id] = [n, temp]
+            grid_params[cell_id] = [p, temp]
 
     return grid_params
+
+
+def pars_target(f_name: str) -> (list[int], list[int]):
+    with open(f_name) as file:
+        lines = [line for line in file]
+
+    density_labels, density_values = [], []
+    for line in lines:
+        params = line.split(' ')
+        density_labels.append(int(params[0]) * gp.density_smoothing)
+        density_values.append(int(params[1]))
+
+    return density_labels, density_values

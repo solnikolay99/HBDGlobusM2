@@ -71,7 +71,7 @@ def calculate_density2(width: int,
 
 def calculate_density_diameter(densities: list[int], percentile: float, reducer: int) -> (float, float, float):
     min_y = 0
-    max_y = len(densities) - 3
+    max_y = len(densities)
 
     if len(densities) == 0:
         return 0.0, 0.0, 0.0

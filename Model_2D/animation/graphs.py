@@ -2,7 +2,6 @@ import matplotlib
 from PIL import Image
 
 from animation.graphdata.data import *
-from animation.graphdata.calculate_params import *
 
 
 def show_textor_graph(ax: matplotlib.axes, data: list[list[float]]):
@@ -22,7 +21,7 @@ def show_density_graph(ax: matplotlib.axes,
 
     timestep = float(gp.global_params.get('timestep'))
 
-    ax.set_title(f"Плотность\nТаймфрейм:{(timestep * 1e6 * frame): 6.2f} мкс")
+    ax.set_title(f"Плотность\nТаймфрейм:{(timestep * 1e6 * frame * 100): 6.2f} мкс")
     ax.set_xticks(
         [0, 500, 1000, 1500, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000],
         labels=[0, 5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150])
@@ -53,7 +52,7 @@ def show_temperature_graph(ax: matplotlib.axes,
 
     graphs = separate_points_by_temp(timeframe)
 
-    ax.set_title(f"Температура\nТаймфрейм:{(timestep * 1e6 * frame): 6.2f} мкс")
+    ax.set_title(f"Температура\nТаймфрейм:{(timestep * 1e6 * frame * 100): 6.2f} мкс")
     ax.set_xticks(
         [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000],
         labels=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150])
@@ -72,16 +71,49 @@ def show_temperature_graph(ax: matplotlib.axes,
     ax.imshow(mask, extent=[0, mask.width, 0, mask.height])
 
 
+def show_temperature_graph2(ax: matplotlib.axes,
+                            frame: int,
+                            timeframe: list[list[float]],
+                            mask: Image) -> matplotlib.image.AxesImage:
+    ax.clear()
+
+    timestep = float(gp.global_params.get('timestep'))
+
+    timeframe = adjust_points_by_temp(timeframe)
+
+    cells_colored = []
+    for i in range(gp.global_params['height_cells']):
+        cells_colored.append([])
+        for j in range(gp.global_params['width_cells']):
+            cells_colored[len(cells_colored) - 1].append(-1)
+
+    ax.set_title(f"Температура\nТаймфрейм:{(timestep * 1e6 * frame * 100): 6.2f} мкс")
+    ax.set_xticks(
+        [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000],
+        labels=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150])
+    ax.set_yticks([0, 100, 200, 300, 400], labels=[0, 1, 2, 3, 4])
+    ax.set_xlabel('см')
+    ax.set_ylabel('см')
+
+    for point in timeframe:
+        if len(point) == 0:
+            continue
+        cells_colored[int(point[1])][int(point[0])] = point[4]
+
+    ax.imshow(mask, extent=[0, mask.width, 0, mask.height])
+    return ax.imshow(cells_colored, cmap='plasma')
+
+
 def shift_labels_by_smoothing(in_values: list[int], in_labels: list[float], smoothing: int) -> (list[int], list[float]):
     out_values, out_labels = [], []
     if len(in_labels) > 0:
         out_values.append(0)
-        out_labels.append(in_labels[0] * smoothing)
+        out_labels.append(in_labels[0] * smoothing / 10)
         for i in range(1, len(in_labels) - 1):
             out_values.append(in_values[i])
-            out_labels.append(in_labels[i] * smoothing)
+            out_labels.append(in_labels[i] * smoothing / 10)
         out_values.append(0)
-        out_labels.append(in_labels[len(in_labels) - 1] * smoothing)
+        out_labels.append(in_labels[len(in_labels) - 1] * smoothing / 10)
     return out_values, out_labels
 
 
@@ -104,7 +136,8 @@ def show_target_graph(ax: matplotlib.axes):
     else:
         out_percent = (out_points / total_points) * 100
 
-    values, labels = shift_labels_by_smoothing(gp.density_values, gp.density_labels, gp.density_smoothing)
+    #values, labels = shift_labels_by_smoothing(gp.density_values, gp.density_labels, gp.density_smoothing)
+    values, labels = gp.density_values, gp.density_labels
 
     ax.set_title(f"Общее число частиц: {total_points:.2e} ({len(gp.uniq_points)} модельных)\n"
                  f"Плотность на выходе: {out_points:.2e} ({sum_count_points} модельных) {out_percent:.2f}%\n"
@@ -121,13 +154,13 @@ def show_target_graph(ax: matplotlib.axes):
 
     ax.set_xlabel('y, мм')
     ax.set_ylabel('x, ед.')
-    ax.set_xlim(0, height / gp.multiplayer * 10)
+    # ax.set_xlim(0, height / gp.multiplayer * 10)
 
 
-def show_nozzle_graph(ax: matplotlib.axes,
-                      frame: int,
-                      timeframe: list[list[float]],
-                      mask: Image):
+def show_nozzle_density_graph(ax: matplotlib.axes,
+                              frame: int,
+                              timeframe: list[list[float]],
+                              mask: Image):
     height = gp.global_params['height']
     multiply = 20
     min_x = 0
@@ -142,7 +175,45 @@ def show_nozzle_graph(ax: matplotlib.axes,
     exclude_points(timeframe, min_x, max_x, min_y, max_y, multiply)
     graphs = separate_points_by_density(timeframe)
 
-    ax.set_title(f"Плотность\nТаймфрейм:{(timestep * 1e6 * frame): 6.2f} мкс")
+    ax.set_title(f"Плотность\nТаймфрейм:{(timestep * 1e6 * frame * 100): 6.2f} мкс")
+    ax.set_xticks(
+        [0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000],
+        labels=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+    ax.set_yticks([0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000],
+                  labels=[0, 0.25, 0.50, 0.75, 1, 1.25, 1.50, 1.75, 2, 2.25, 2.50])
+    ax.set_xlabel('мм')
+    ax.set_ylabel('мм')
+
+    for graph in graphs:
+        if len(graph['points']) > 0:
+            ax.scatter(graph['points'][0], graph['points'][1],
+                       marker='.', s=0.5, color=graph['color'], label=graph['legend'])
+
+    ax.legend(bbox_to_anchor=(0, -1.2, 1, -0.1), loc="lower left",
+              mode="expand", borderaxespad=0, ncol=2, facecolor="darkgreen")
+
+    ax.imshow(mask, extent=[0, mask.width, 0, mask.height])
+
+
+def show_nozzle_temperature_graph(ax: matplotlib.axes,
+                                  frame: int,
+                                  timeframe: list[list[float]],
+                                  mask: Image):
+    height = gp.global_params['height']
+    multiply = 20
+    min_x = 0
+    max_x = 150
+    min_y = (height / 2) - 15
+    max_y = (height / 2) + 15
+
+    ax.clear()
+
+    timestep = float(gp.global_params.get('timestep'))
+
+    exclude_points(timeframe, min_x, max_x, min_y, max_y, multiply)
+    graphs = separate_points_by_temp(timeframe)
+
+    ax.set_title(f"Температура\nТаймфрейм:{(timestep * 1e6 * frame * 100): 6.2f} мкс")
     ax.set_xticks(
         [0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000],
         labels=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])

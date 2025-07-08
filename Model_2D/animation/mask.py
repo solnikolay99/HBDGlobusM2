@@ -59,4 +59,5 @@ def create_small_mask(new_width: int, new_height: int) -> Image:
     background = Image.new('RGBA', (new_width * multiply, new_height * multiply), (193, 219, 225, 255))
     background.paste(template)
     back_crop = background.crop((0, round(new_height * multiply / 2) - 300, 3000, round(new_height * multiply / 2) + 300))
+    #back_crop = background.crop((0, new_height * multiply - 300, 3000, new_height * multiply))
     return back_crop

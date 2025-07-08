@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
 
 matplotlib.rcParams['legend.markerscale'] = 20
-multiplayer = 2000  # 200
+multiplayer = 100000  # 2000
 
 
 def pars_in_file(f_name: str) -> dict[str, any]:
@@ -31,8 +31,8 @@ def pars_in_file(f_name: str) -> dict[str, any]:
             for i in range(1, len(params), 2):
                 out_params[params[i].strip()] = params[i + 1].strip()
         elif params[0].strip() == 'create_box':
-            out_params['width'] = int(float(params[2].strip()) - float(params[1].strip())) * multiplayer
-            out_params['height'] = int(float(params[4].strip()) - float(params[3].strip())) * multiplayer
+            out_params['width'] = int((float(params[2].strip()) - float(params[1].strip())) * multiplayer)
+            out_params['height'] = int((float(params[4].strip()) - float(params[3].strip())) * multiplayer)
         elif params[0].strip() == 'timestep':
             out_params['timestep'] = params[1].strip()
         elif params[0].strip() == 'region':
@@ -125,7 +125,9 @@ def create_mask_template(in_file: str) -> (Image, int):
     flg = False
     colors = [
         (127, 127, 127, 255),
-        (0, 0, 0, 255)
+        (0, 0, 0, 255),
+        (0, 0, 0, 255),
+        (0, 255, 0, 255)
     ]
     color_number = 0
     for surf in surfs:
@@ -159,6 +161,7 @@ def create_mask_template(in_file: str) -> (Image, int):
                 (x_hi, y_lo),
             ]
             draw.polygon(polygon, fill=(215, 0, 0, 255))
+            print(f'Draw region: ({x_lo}, {y_lo}) to ({x_hi}, {y_hi})')
 
     for point in real_points:
         x = int(point[0] * multiplayer)
@@ -180,25 +183,26 @@ def create_mask(template: Image, new_width: int, new_height: int, max_x: int) ->
     background = Image.new('RGBA', (max(new_width, max_x + 50), new_height), (255, 255, 255, 255))
     background.paste(template)
     background = background.transpose(method=Image.FLIP_TOP_BOTTOM)
-    back_crop = background.crop((0, round(new_height / 2) - 400, 7000, round(new_height / 2) + 400))
-    # back_crop = background.crop((0, round(new_height / 2) - 5000, max_x, round(new_height / 2) + 5000))
-    # back_crop = background.crop((0, new_height - 4500, 2500, new_height - 0))
+    print(f'Image size: {background.size[0]} to {background.size[1]}')
+    back_crop = background.crop((0, round(new_height / 2) - 200, 500, round(new_height / 2) + 200))
+    #back_crop = background.crop((199500, round(new_height / 2) - 600, 200500, round(new_height / 2) + 600))
+    #back_crop = background.crop((new_width - 1000, round(new_height / 2) - 100, new_width, round(new_height / 2) + 100))
     return background
 
 
 def save_mask(file_name: str):
     mask_tmpl, max_x = create_mask_template(main_dir_path + '\\' + file_name)
     max_x += 10
-    mask_tmpl = create_mask(mask_tmpl, 20 * multiplayer, 4 * multiplayer, max_x)
+    mask_tmpl = create_mask(mask_tmpl, int(0.27 * multiplayer), int(0.04 * multiplayer), max_x)
     fig, (ax1) = plt.subplots(1, 1, figsize=(15, 6))
 
     plt.xlabel('см')
-    plt.ylabel('см')
-    x_ticks = np.arange(0, mask_tmpl.width + 1, 1000)
-    x_labels = [f'{int(x / 200)}' for x in x_ticks]
+    plt.ylabel('мм')
+    x_ticks = np.arange(0, mask_tmpl.width + 1, multiplayer * 10)
+    x_labels = [f'{(x / multiplayer):.0f}' for x in x_ticks]
     ax1.set_xticks(x_ticks, labels=x_labels)
-    y_ticks = np.arange(0, mask_tmpl.height + 1, 1000)
-    y_labels = [f'{int(y / 200)}' for y in y_ticks]
+    y_ticks = np.arange(0, mask_tmpl.height + 1, multiplayer)
+    y_labels = [f'{y / multiplayer:.0f}' for y in y_ticks]
     ax1.set_yticks(y_ticks, labels=y_labels)
 
     '''
@@ -218,6 +222,7 @@ def save_mask(file_name: str):
 
 if __name__ == '__main__':
     main_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\sparta_git\\textor'
+    #main_dir_path = os.getcwd() + '/'
 
     real_points = [
         # [0.004177, 1.997785, 0.000000],
@@ -227,6 +232,6 @@ if __name__ == '__main__':
         # [0.007708, 2.000062, 0.000000],
     ]
 
-    # save_mask('in.step')
-    # save_mask('in.step.temp')
-    save_mask('in.step')
+    #save_mask('in.step')
+    save_mask('parameters/textor_si/in.step')
+    #save_mask('in.ci.step')
