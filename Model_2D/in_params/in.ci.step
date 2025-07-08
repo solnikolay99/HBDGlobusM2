@@ -10,11 +10,11 @@
 seed	    	    35779
 dimension   	    2
 global              gridcut 0.0 comm/sort yes
-units               cgs
+units               si
 
 boundary	    ro o p
 
-create_box  	    0 23 0 4 -0.0025 0.0025
+create_box  	    0 0.23 0 0.04 -0.000025 0.000025
 create_grid 	    4600 800 1
 
 balance_grid        rcb cell
@@ -22,17 +22,17 @@ balance_grid        rcb cell
 global		    fnum 1e15
 
 species		    air.ci.species He
-mixture		    air He nrho 2.415e17 temp 300
+mixture		    air He nrho 4.830e23 temp 300
 
-read_surf	    nozzle.capillary.step
+read_surf	    nozzle.ci.capillary.step
 surf_collide	    1 td 300
 surf_modify         all collide 1
 
-collide             vss air air.vss
+collide             vss air air.ci.vss
 
-region              nozzle block 0 0.005 1.983 2.017 -0.025 0.025
+region              nozzle block 0 0.00005 0.01983 0.02017 -0.00025 0.00025
 
-fix		    in emit/face air xlo region nozzle subsonic 1000000 NULL twopass
+fix		    in emit/face air xlo region nozzle subsonic 200000 NULL twopass
 
 timestep 	    5e-8
 
@@ -41,19 +41,19 @@ timestep 	    5e-8
 
 compute		    gTemp thermal/grid all air press temp
 fix		    aveGridTemp ave/grid all 1 100 100 c_gTemp[*]
-compute		    gridP grid all air u v n nrho
+compute		    gridP grid all air u ke n nrho
 fix		    aveGridU ave/grid all 1 100 100 c_gridP[*]
-dump		    4 grid all 100 /home/nlpmit/nsoloviev/sparta_git/textor/dumps/grid.*.txt id proc f_aveGridTemp[1] f_aveGridTemp[2] f_aveGridU[1] f_aveGridU[3] f_aveGridU[4]
-#dump		    4 grid all 100 /home/nlpmit/nsoloviev/sparta_git/textor/dumps/grid.*.txt id proc c_gTemp[1] c_gTemp[2] c_gridP[1] c_gridP[3] c_gridP[4]
+dump		    4 grid all 100 /home/nlpmit/nsoloviev/sparta_git/textor/dumps/grid.*.txt id proc f_aveGridTemp[1] f_aveGridTemp[2] f_aveGridU[1] f_aveGridU[2] f_aveGridU[3] f_aveGridU[4]
+#dump		    4 grid all 100 /home/nlpmit/nsoloviev/sparta_git/textor/dumps/grid.*.txt id proc c_gTemp[1] c_gTemp[2] c_gridP[1] c_gridP[2] c_gridP[3] c_gridP[4]
 dump_modify	    4 pad 6
 
-region              target block 22.95 23 0 4 -0.025 0.025
+region              target block 0.2295 0.23 0 0.04 -0.00025 0.00025
 dump                5 particle all 1 /home/nlpmit/nsoloviev/sparta_git/textor/dumps/target.*.txt id x y
 dump_modify	    5 pad 6 region target
 
 dump		    6 grid all 100000 /home/nlpmit/nsoloviev/sparta_git/textor/dumps/cells.txt id xlo ylo xhi yhi
 
-region              influx block 0 0.05 1.7 2.3 -0.025 0.025
+region              influx block 0 0.0005 0.017 0.023 -0.00025 0.00025
 dump                8 particle all 1 /home/nlpmit/nsoloviev/sparta_git/textor/dumps/influx.*.txt id
 dump_modify	    8 pad 6 region influx
 

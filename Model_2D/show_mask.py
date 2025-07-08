@@ -12,9 +12,12 @@ from PIL import Image, ImageDraw
 
 matplotlib.rcParams['legend.markerscale'] = 20
 multiplayer = 100000  # 2000
+global_params = {}
 
 
 def pars_in_file(f_name: str) -> dict[str, any]:
+    global multiplayer
+
     out_params = dict()
     with open(f_name) as file:
         lines = [line.rstrip() for line in file]
@@ -27,6 +30,12 @@ def pars_in_file(f_name: str) -> dict[str, any]:
             continue
         if params[0].startswith('#'):
             continue
+        elif params[0].strip() == 'units':
+            if params[1].strip() == 'cgs':
+                multiplayer = multiplayer / 100
+                out_params['units'] = True
+            else:
+                out_params['units'] = False
         elif params[0].strip() == 'global':
             for i in range(1, len(params), 2):
                 out_params[params[i].strip()] = params[i + 1].strip()
@@ -92,11 +101,12 @@ def pars_surf_file(f_name: str) -> (dict[int, dict[str, int]], dict[int, dict[st
 
 
 def create_mask_template(in_file: str) -> (Image, int):
+    global global_params
     surfs = []
 
     global_params = pars_in_file(in_file)
-    max_x = global_params['width'] + int(0.1 * multiplayer)
-    max_y = global_params['height'] + int(0.1 * multiplayer)
+    max_x = global_params['width']
+    max_y = global_params['height']
 
     for surf_file in global_params['surfs']:
         points, lines, polygons = pars_surf_file(surf_file)
@@ -176,28 +186,30 @@ def create_mask_template(in_file: str) -> (Image, int):
     ]
     draw.polygon(polygon_target, fill=(0, 0, 215, 255))
 
-    return image, max_x
+    return image, max_x, max_y
 
 
-def create_mask(template: Image, new_width: int, new_height: int, max_x: int) -> Image:
-    background = Image.new('RGBA', (max(new_width, max_x + 50), new_height), (255, 255, 255, 255))
+def create_mask(template: Image, new_width: int, new_height: int) -> Image:
+    background = Image.new('RGBA', (new_width, new_height), (255, 255, 255, 255))
     background.paste(template)
     background = background.transpose(method=Image.FLIP_TOP_BOTTOM)
     print(f'Image size: {background.size[0]} to {background.size[1]}')
     back_crop = background.crop((0, round(new_height / 2) - 200, 500, round(new_height / 2) + 200))
-    #back_crop = background.crop((199500, round(new_height / 2) - 600, 200500, round(new_height / 2) + 600))
-    #back_crop = background.crop((new_width - 1000, round(new_height / 2) - 100, new_width, round(new_height / 2) + 100))
     return background
 
 
 def save_mask(file_name: str):
-    mask_tmpl, max_x = create_mask_template(main_dir_path + '\\' + file_name)
+    global global_params, multiplayer
+
+    mask_tmpl, max_x, max_y = create_mask_template(main_dir_path + '\\' + file_name)
     max_x += 10
-    mask_tmpl = create_mask(mask_tmpl, int(0.27 * multiplayer), int(0.04 * multiplayer), max_x)
+    mask_tmpl = create_mask(mask_tmpl, max_x, max_y)
     fig, (ax1) = plt.subplots(1, 1, figsize=(15, 6))
 
     plt.xlabel('см')
-    plt.ylabel('мм')
+    plt.ylabel('см')
+    if not global_params['units']:
+        multiplayer = multiplayer / 100  # Convert to cm
     x_ticks = np.arange(0, mask_tmpl.width + 1, multiplayer * 10)
     x_labels = [f'{(x / multiplayer):.0f}' for x in x_ticks]
     ax1.set_xticks(x_ticks, labels=x_labels)
@@ -221,8 +233,8 @@ def save_mask(file_name: str):
 
 
 if __name__ == '__main__':
-    main_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\sparta_git\\textor'
-    #main_dir_path = os.getcwd() + '/'
+    # main_dir_path = '\\\\wsl.localhost\\Ubuntu\\home\\c\\sparta_git\\textor'
+    main_dir_path = os.getcwd() + '\\in_params'
 
     real_points = [
         # [0.004177, 1.997785, 0.000000],
@@ -233,5 +245,4 @@ if __name__ == '__main__':
     ]
 
     #save_mask('in.step')
-    save_mask('parameters/textor_si/in.step')
-    #save_mask('in.ci.step')
+    save_mask('in.step')
