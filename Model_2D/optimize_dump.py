@@ -81,7 +81,7 @@ def optimize_influx():
             print(f"Pars influx file {files[i]}")
             #store_influx_data(files[i].replace('influx.', 'influx_sum.'), point_velocities)
             store_influx_ids_data(files[i].replace('influx.', 'influx_sum.'), len(uniq_point_ids))
-        os.remove(files[i])
+        #os.remove(files[i])
 
 
 def store_target_data(f_name: str, density_labels: list, density_values: list):
@@ -110,13 +110,13 @@ def optimize_target():
 
 
 if __name__ == '__main__':
-    gp.global_params = pars_in_file(os.path.join(gp.main_dir_path, 'in.step' if len(sys.argv) < 2 else sys.argv[1]))
+    gp.global_params = pars_in_file(os.path.join(gp.main_dir_path, 'in.ci.step' if len(sys.argv) < 2 else sys.argv[1]))
     #gp.density_smoothing = 8 if len(sys.argv) < 3 else float(sys.argv[2])
 
     print(f'Folder size before optimization: {(get_dir_size(gp.parts_dir_path, "/") / 1024 ** 3):.2f} GB')
 
-    #optimize_grid_params()
-    #optimize_influx()
+    optimize_grid_params()
+    optimize_influx()
     optimize_target()
 
     print(f'Folder size after optimization: {(get_dir_size(gp.parts_dir_path, "/") / 1024 ** 3):.2f} GB')
